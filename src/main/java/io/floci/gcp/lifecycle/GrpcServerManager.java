@@ -9,10 +9,13 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 
 @Startup
 @ApplicationScoped
 public class GrpcServerManager {
+
+    private static final Logger LOG = Logger.getLogger(GrpcServerManager.class);
 
     private final io.vertx.core.Vertx vertx;
     private final Router router;
@@ -34,6 +37,11 @@ public class GrpcServerManager {
         router.route().order(Integer.MIN_VALUE).handler(ctx -> {
             String ct = ctx.request().getHeader("Content-Type");
             if (ct != null && ct.startsWith("application/grpc")) {
+                long start = System.currentTimeMillis();
+                String path = ctx.request().path();
+                String remoteAddr = ctx.request().remoteAddress() != null ? ctx.request().remoteAddress().host() : "-";
+                ctx.request().response().endHandler(v ->
+                        LOG.infof("%s gRPC %s %dms", remoteAddr, path, System.currentTimeMillis() - start));
                 grpcServer.handle(ctx.request());
             } else {
                 ctx.next();
