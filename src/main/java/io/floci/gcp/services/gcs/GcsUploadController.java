@@ -1,0 +1,211 @@
+package io.floci.gcp.services.gcs;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.floci.gcp.config.EmulatorConfig;
+import io.floci.gcp.core.common.GcpException;
+import io.floci.gcp.services.gcs.model.GcsObjectMeta;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+@ApplicationScoped
+@Path("/upload/storage/v1/b/{bucket}/o")
+@Produces(MediaType.APPLICATION_JSON)
+public class GcsUploadController {
+
+    private static final Charset ISO = StandardCharsets.ISO_8859_1;
+
+    private final GcsService service;
+    private final EmulatorConfig config;
+    private final ObjectMapper objectMapper;
+
+    @Inject
+    public GcsUploadController(GcsService service, EmulatorConfig config, ObjectMapper objectMapper) {
+        this.service = service;
+        this.config = config;
+        this.objectMapper = objectMapper;
+    }
+
+    @POST
+    @Consumes(MediaType.WILDCARD)
+    public Response upload(
+            @PathParam("bucket") String bucket,
+            @QueryParam("uploadType") String uploadType,
+            @QueryParam("name") String nameParam,
+            @jakarta.ws.rs.core.Context HttpHeaders headers,
+            byte[] body) {
+        if ("multipart".equals(uploadType)) {
+            return handleMultipart(bucket, headers, body);
+        } else if ("resumable".equals(uploadType)) {
+            return handleStartResumable(bucket, nameParam, headers, body);
+        } else if ("media".equals(uploadType)) {
+            return handleMedia(bucket, nameParam, headers, body);
+        }
+        throw GcpException.invalidArgument("unsupported uploadType: " + uploadType);
+    }
+
+    @PUT
+    @Consumes(MediaType.WILDCARD)
+    public Response resumablePut(
+            @PathParam("bucket") String bucket,
+            @QueryParam("upload_id") String uploadId,
+            @jakarta.ws.rs.core.Context HttpHeaders headers,
+            byte[] body) {
+        if (uploadId == null) {
+            throw GcpException.invalidArgument("missing upload_id query parameter");
+        }
+        GcsObjectMeta meta = service.completeResumableUpload(uploadId, body, requestBaseUrl(headers));
+        return Response.ok(meta).build();
+    }
+
+    private Response handleMultipart(String bucket, HttpHeaders headers, byte[] body) {
+        String contentType = headers.getHeaderString(HttpHeaders.CONTENT_TYPE);
+        String[] rawParts = parseMultipartRaw(contentType, new String(body, ISO));
+
+        Map<?, ?> metadata;
+        try {
+            metadata = objectMapper.readValue(extractPartBody(rawParts[0]).getBytes(ISO), Map.class);
+        } catch (Exception e) {
+            throw GcpException.invalidArgument("invalid JSON metadata in multipart upload");
+        }
+
+        String objectName = (String) metadata.get("name");
+        String objectContentType = (String) metadata.get("contentType");
+        if (objectContentType == null) {
+            objectContentType = extractPartHeader(rawParts[1], "content-type");
+        }
+        byte[] dataBytes = extractPartBody(rawParts[1]).getBytes(ISO);
+        GcsObjectMeta meta = service.putObject(bucket, objectName, objectContentType, dataBytes, requestBaseUrl(headers));
+        return Response.ok(meta).build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Response handleStartResumable(String bucket, String nameParam, HttpHeaders headers, byte[] body) {
+        String contentType = headers.getHeaderString("X-Upload-Content-Type");
+        String name = nameParam;
+
+        if (body != null && body.length > 0) {
+            try {
+                Map<String, Object> meta = objectMapper.readValue(body, Map.class);
+                if (name == null) {
+                    name = (String) meta.get("name");
+                }
+                if (contentType == null) {
+                    contentType = (String) meta.get("contentType");
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (name == null) {
+            name = "unknown";
+        }
+        if (contentType == null) {
+            contentType = "application/octet-stream";
+        }
+
+        String uploadId = service.startResumableUpload(bucket, name, contentType);
+        String location = requestBaseUrl(headers) + "/upload/storage/v1/b/" + bucket
+                + "/o?uploadType=resumable&upload_id=" + uploadId;
+
+        return Response.ok().header("Location", location).build();
+    }
+
+    private Response handleMedia(String bucket, String name, HttpHeaders headers, byte[] body) {
+        String contentType = headers.getHeaderString(HttpHeaders.CONTENT_TYPE);
+        GcsObjectMeta meta = service.putObject(bucket, name, contentType, body, requestBaseUrl(headers));
+        return Response.ok(meta).build();
+    }
+
+    private String requestBaseUrl(HttpHeaders headers) {
+        String host = headers.getHeaderString("Host");
+        return host != null ? "http://" + host : config.baseUrl();
+    }
+
+    private static String[] parseMultipartRaw(String contentType, String bodyStr) {
+        String boundary = "--" + extractBoundary(contentType);
+
+        int first = bodyStr.indexOf(boundary);
+        if (first < 0) {
+            throw GcpException.invalidArgument("multipart boundary not found in body");
+        }
+        int second = bodyStr.indexOf(boundary, first + boundary.length());
+        if (second < 0) {
+            throw GcpException.invalidArgument("only one multipart part found");
+        }
+        int third = bodyStr.indexOf(boundary, second + boundary.length());
+        if (third < 0) {
+            third = bodyStr.length();
+        }
+
+        return new String[]{
+                bodyStr.substring(first + boundary.length(), second),
+                bodyStr.substring(second + boundary.length(), third)
+        };
+    }
+
+    private static String extractPartHeader(String part, String headerName) {
+        int headersEnd = part.indexOf("\r\n\r\n");
+        String sep = "\r\n";
+        if (headersEnd < 0) {
+            headersEnd = part.indexOf("\n\n");
+            sep = "\n";
+        }
+        if (headersEnd < 0) {
+            return null;
+        }
+        String headerSection = part.substring(0, headersEnd);
+        for (String line : headerSection.split(sep)) {
+            if (line.toLowerCase().startsWith(headerName + ":")) {
+                String value = line.substring(headerName.length() + 1).trim();
+                int semi = value.indexOf(';');
+                return semi >= 0 ? value.substring(0, semi).trim() : value;
+            }
+        }
+        return null;
+    }
+
+    private static String extractBoundary(String contentType) {
+        if (contentType == null) {
+            throw GcpException.invalidArgument("missing Content-Type header for multipart upload");
+        }
+        for (String segment : contentType.split(";")) {
+            String trimmed = segment.trim();
+            if (trimmed.startsWith("boundary=")) {
+                String boundary = trimmed.substring("boundary=".length());
+                if (boundary.startsWith("\"") && boundary.endsWith("\"")) {
+                    boundary = boundary.substring(1, boundary.length() - 1);
+                }
+                return boundary;
+            }
+        }
+        throw GcpException.invalidArgument("missing boundary in Content-Type: " + contentType);
+    }
+
+    private static String extractPartBody(String part) {
+        int idx = part.indexOf("\r\n\r\n");
+        if (idx >= 0) {
+            String partBody = part.substring(idx + 4);
+            if (partBody.endsWith("\r\n")) {
+                partBody = partBody.substring(0, partBody.length() - 2);
+            }
+            return partBody;
+        }
+        idx = part.indexOf("\n\n");
+        if (idx >= 0) {
+            String partBody = part.substring(idx + 2);
+            if (partBody.endsWith("\n")) {
+                partBody = partBody.substring(0, partBody.length() - 1);
+            }
+            return partBody;
+        }
+        return part;
+    }
+}
