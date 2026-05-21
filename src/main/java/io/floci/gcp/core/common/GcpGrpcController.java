@@ -21,6 +21,14 @@ public abstract class GcpGrpcController {
     }
 
     protected StatusRuntimeException toStatusException(Throwable t) {
+        return grpcException(t);
+    }
+
+    public static <T> void grpcError(StreamObserver<T> observer, Throwable t) {
+        observer.onError(grpcException(t));
+    }
+
+    public static StatusRuntimeException grpcException(Throwable t) {
         if (t instanceof GcpException ex) {
             return ex.getGrpcCode().toStatus()
                     .withDescription(ex.getMessage())

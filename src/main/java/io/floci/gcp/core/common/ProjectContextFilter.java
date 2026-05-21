@@ -48,6 +48,10 @@ public class ProjectContextFilter implements ContainerRequestFilter {
                 return m.group(1);
             }
         }
+        String projectParam = ctx.getUriInfo().getQueryParameters().getFirst("project");
+        if (projectParam != null && !projectParam.isBlank()) {
+            return projectParam;
+        }
         String params = ctx.getHeaderString("x-goog-request-params");
         if (params != null) {
             Matcher m = PARAM_PROJECT.matcher(params);
