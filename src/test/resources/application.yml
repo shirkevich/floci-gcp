@@ -10,3 +10,6 @@ floci-gcp:
   default-project-id: test-project
   storage:
     mode: memory
+  services:
+    datastore:
+      enabled: true
