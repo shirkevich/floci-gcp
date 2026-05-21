@@ -26,7 +26,7 @@ public final class TestFixtures {
     }
 
     public static String endpoint() {
-        return System.getenv().getOrDefault("FLOCI_GCP_ENDPOINT", "http://localhost:4578");
+        return System.getenv().getOrDefault("FLOCI_GCP_ENDPOINT", "http://localhost:4588");
     }
 
     public static String uniqueName(String prefix) {
@@ -78,7 +78,7 @@ public final class TestFixtures {
     public static SecretManagerServiceClient secretManagerClient() throws IOException {
         URI uri = URI.create(endpoint());
         String host = uri.getHost();
-        int port = uri.getPort() > 0 ? uri.getPort() : 4578;
+        int port = uri.getPort() > 0 ? uri.getPort() : 4588;
 
         SecretManagerServiceSettings settings = SecretManagerServiceSettings.newBuilder()
                 .setTransportChannelProvider(

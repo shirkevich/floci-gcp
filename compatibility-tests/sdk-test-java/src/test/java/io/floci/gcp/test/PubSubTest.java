@@ -55,7 +55,7 @@ class PubSubTest {
 
     @BeforeAll
     static void setUp() throws IOException {
-        String emulatorHost = System.getenv().getOrDefault("PUBSUB_EMULATOR_HOST", "localhost:4578");
+        String emulatorHost = System.getenv().getOrDefault("PUBSUB_EMULATOR_HOST", "localhost:4588");
 
         channel = ManagedChannelBuilder.forTarget(emulatorHost)
                 .usePlaintext()

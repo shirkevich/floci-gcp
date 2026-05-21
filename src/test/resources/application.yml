@@ -6,7 +6,7 @@ quarkus:
         level: INFO
 
 floci-gcp:
-  port: 4578
+  port: 4588
   default-project-id: test-project
   storage:
     mode: memory

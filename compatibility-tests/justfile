@@ -2,18 +2,24 @@
 set export
 set dotenv-load
 
-FLOCI_GCP_ENDPOINT := env('FLOCI_GCP_ENDPOINT', 'http://localhost:4578')
+FLOCI_GCP_ENDPOINT := env('FLOCI_GCP_ENDPOINT', 'http://localhost:4588')
 FLOCI_GCP_PROJECT := env('FLOCI_GCP_PROJECT', 'test-project')
-PUBSUB_EMULATOR_HOST := env('PUBSUB_EMULATOR_HOST', 'localhost:4578')
-FIRESTORE_EMULATOR_HOST := env('FIRESTORE_EMULATOR_HOST', 'localhost:4578')
-DATASTORE_EMULATOR_HOST := env('DATASTORE_EMULATOR_HOST', 'localhost:4578')
-STORAGE_EMULATOR_HOST := env('STORAGE_EMULATOR_HOST', 'http://localhost:4578')
+PUBSUB_EMULATOR_HOST := env('PUBSUB_EMULATOR_HOST', 'localhost:4588')
+FIRESTORE_EMULATOR_HOST := env('FIRESTORE_EMULATOR_HOST', 'localhost:4588')
+DATASTORE_EMULATOR_HOST := env('DATASTORE_EMULATOR_HOST', 'localhost:4588')
+STORAGE_EMULATOR_HOST := env('STORAGE_EMULATOR_HOST', 'http://localhost:4588')
+SECRET_MANAGER_EMULATOR_HOST := env('SECRET_MANAGER_EMULATOR_HOST', 'localhost:4588')
 
 default:
     @just --list
 
 test-all:
     just test-java
+    just test-python
+    just test-node
+    just test-go
+
+# ── Java ─────────────────────────────────────────────────────────────────────
 
 [working-directory: 'sdk-test-java']
 test-java:
@@ -23,7 +29,42 @@ test-java:
 setup-java:
     mvn dependency:resolve -q
 
-setup: setup-java
+# ── Python ───────────────────────────────────────────────────────────────────
+
+[working-directory: 'sdk-test-python']
+test-python:
+    .venv/bin/pytest tests/ -v
+
+[working-directory: 'sdk-test-python']
+setup-python:
+    python3 -m venv .venv
+    .venv/bin/pip install -r requirements.txt -q
+
+# ── Node.js ──────────────────────────────────────────────────────────────────
+
+[working-directory: 'sdk-test-node']
+test-node:
+    npm test
+
+[working-directory: 'sdk-test-node']
+setup-node:
+    npm install
+
+# ── Go ───────────────────────────────────────────────────────────────────────
+
+[working-directory: 'sdk-test-go']
+test-go:
+    go test ./tests/... -v -timeout 120s
+
+[working-directory: 'sdk-test-go']
+setup-go:
+    go mod tidy
+
+# ── Combined setup ───────────────────────────────────────────────────────────
+
+setup: setup-java setup-python setup-node setup-go
+
+# ── Cleanup ──────────────────────────────────────────────────────────────────
 
 [working-directory: 'sdk-test-java']
 clean:

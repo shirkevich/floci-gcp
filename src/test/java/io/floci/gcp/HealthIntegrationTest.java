@@ -25,7 +25,7 @@ class HealthIntegrationTest {
             .when().get("/_floci-gcp/info")
             .then()
             .statusCode(200)
-            .body("port", equalTo(4578))
+            .body("port", equalTo(4588))
             .body("defaultProject", equalTo("test-project"));
     }
 

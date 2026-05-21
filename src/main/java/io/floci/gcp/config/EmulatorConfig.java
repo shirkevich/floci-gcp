@@ -9,10 +9,10 @@ import java.util.Optional;
 @ConfigMapping(prefix = "floci-gcp")
 public interface EmulatorConfig {
 
-    @WithDefault("4578")
+    @WithDefault("4588")
     int port();
 
-    @WithDefault("http://localhost:4578")
+    @WithDefault("http://localhost:4588")
     String baseUrl();
 
     Optional<String> hostname();

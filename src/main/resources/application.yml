@@ -10,6 +10,10 @@ quarkus:
     limits:
       max-body-size: ${floci-gcp.max-request-size}M
 
+  grpc:
+    server:
+      use-separate-server: false
+
   shutdown:
     delay-enabled: true
 
@@ -20,9 +24,9 @@ quarkus:
       - --enable-url-protocols=http,https
 
 floci-gcp:
-  port: 4578
+  port: 4588
   max-request-size: 512
-  base-url: "http://localhost:4578"
+  base-url: "http://localhost:4588"
   default-project-id: floci-local
   storage:
     mode: memory
