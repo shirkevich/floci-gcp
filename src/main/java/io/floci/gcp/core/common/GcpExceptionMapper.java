@@ -1,6 +1,7 @@
 package io.floci.gcp.core.common;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
@@ -21,8 +22,10 @@ public class GcpExceptionMapper implements ExceptionMapper<GcpException> {
                 .build();
     }
 
+    @RegisterForReflection
     public record ErrorWrapper(@JsonProperty("error") ErrorDetail error) {}
 
+    @RegisterForReflection
     public record ErrorDetail(@JsonProperty("code") int code,
                               @JsonProperty("message") String message,
                               @JsonProperty("status") String status) {}
