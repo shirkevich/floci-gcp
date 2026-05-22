@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
+import java.util.List;
 import java.util.Map;
 
 @RegisterForReflection
@@ -23,6 +24,10 @@ public class GcsBucket {
     private String etag;
     private String projectId;
     private Map<String, String> labels;
+    private Map<String, Object> versioning;
+    private Map<String, Object> lifecycle;
+    private List<Map<String, Object>> cors;
+    private Map<String, Object> retentionPolicy;
 
     public String getKind() { return kind; }
     public void setKind(String kind) { this.kind = kind; }
@@ -63,4 +68,16 @@ public class GcsBucket {
 
     public Map<String, String> getLabels() { return labels; }
     public void setLabels(Map<String, String> labels) { this.labels = labels; }
+
+    public Map<String, Object> getVersioning() { return versioning; }
+    public void setVersioning(Map<String, Object> versioning) { this.versioning = versioning; }
+
+    public Map<String, Object> getLifecycle() { return lifecycle; }
+    public void setLifecycle(Map<String, Object> lifecycle) { this.lifecycle = lifecycle; }
+
+    public List<Map<String, Object>> getCors() { return cors; }
+    public void setCors(List<Map<String, Object>> cors) { this.cors = cors; }
+
+    public Map<String, Object> getRetentionPolicy() { return retentionPolicy; }
+    public void setRetentionPolicy(Map<String, Object> retentionPolicy) { this.retentionPolicy = retentionPolicy; }
 }
