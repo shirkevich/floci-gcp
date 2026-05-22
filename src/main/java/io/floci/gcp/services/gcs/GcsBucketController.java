@@ -36,7 +36,9 @@ public class GcsBucketController {
         if (name == null || name.isBlank()) {
             throw GcpException.invalidArgument("bucket name is required");
         }
-        GcsBucket bucket = service.createBucket(name, project, requestBaseUrl(headers));
+        @SuppressWarnings("unchecked")
+        Map<String, String> labels = (Map<String, String>) body.get("labels");
+        GcsBucket bucket = service.createBucket(name, project, requestBaseUrl(headers), labels);
         return Response.ok(bucket).build();
     }
 
@@ -55,6 +57,13 @@ public class GcsBucketController {
     @Path("/{bucket}")
     public Response getBucket(@PathParam("bucket") String bucket) {
         return Response.ok(service.getBucket(bucket)).build();
+    }
+
+    @PATCH
+    @Path("/{bucket}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response patchBucket(@PathParam("bucket") String bucket, Map<String, Object> body) {
+        return Response.ok(service.updateBucket(bucket, body)).build();
     }
 
     @DELETE

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
+import java.util.Map;
+
 @RegisterForReflection
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GcsBucket {
@@ -20,6 +22,7 @@ public class GcsBucket {
     private String updated;
     private String etag;
     private String projectId;
+    private Map<String, String> labels;
 
     public String getKind() { return kind; }
     public void setKind(String kind) { this.kind = kind; }
@@ -57,4 +60,7 @@ public class GcsBucket {
     @JsonIgnore
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
+
+    public Map<String, String> getLabels() { return labels; }
+    public void setLabels(Map<String, String> labels) { this.labels = labels; }
 }

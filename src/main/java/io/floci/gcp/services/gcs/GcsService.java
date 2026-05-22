@@ -64,7 +64,7 @@ public class GcsService {
                 .build());
     }
 
-    public GcsBucket createBucket(String name, String projectId, String baseUrl) {
+    public GcsBucket createBucket(String name, String projectId, String baseUrl, Map<String, String> labels) {
         LOG.infof("createBucket name=%s project=%s", name, projectId);
         if (bucketStore.get(name).isPresent()) {
             LOG.warnf("createBucket failed: bucket already exists name=%s", name);
@@ -82,6 +82,9 @@ public class GcsService {
         bucket.setUpdated(now);
         bucket.setSelfLink(baseUrl + "/storage/v1/b/" + name);
         bucket.setEtag("CAE=");
+        if (labels != null && !labels.isEmpty()) {
+            bucket.setLabels(labels);
+        }
         bucketStore.put(name, bucket);
         return bucket;
     }
@@ -90,6 +93,19 @@ public class GcsService {
         LOG.debugf("getBucket name=%s", name);
         return bucketStore.get(name)
                 .orElseThrow(() -> GcpException.notFound("Bucket not found: " + name));
+    }
+
+    public GcsBucket updateBucket(String name, Map<String, Object> patch) {
+        LOG.infof("updateBucket name=%s", name);
+        GcsBucket bucket = getBucket(name);
+        if (patch.containsKey("labels")) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> labels = (Map<String, String>) patch.get("labels");
+            bucket.setLabels(labels);
+        }
+        bucket.setUpdated(Instant.now().toString());
+        bucketStore.put(name, bucket);
+        return bucket;
     }
 
     public void deleteBucket(String name) {

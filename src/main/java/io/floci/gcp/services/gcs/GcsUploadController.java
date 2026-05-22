@@ -42,7 +42,7 @@ public class GcsUploadController {
             @jakarta.ws.rs.core.Context HttpHeaders headers,
             byte[] body) {
         if ("multipart".equals(uploadType)) {
-            return handleMultipart(bucket, headers, body);
+            return handleMultipart(bucket, nameParam, headers, body);
         } else if ("resumable".equals(uploadType)) {
             return handleStartResumable(bucket, nameParam, headers, body);
         } else if ("media".equals(uploadType)) {
@@ -65,7 +65,7 @@ public class GcsUploadController {
         return Response.ok(meta).build();
     }
 
-    private Response handleMultipart(String bucket, HttpHeaders headers, byte[] body) {
+    private Response handleMultipart(String bucket, String nameParam, HttpHeaders headers, byte[] body) {
         String contentType = headers.getHeaderString(HttpHeaders.CONTENT_TYPE);
         String[] rawParts = parseMultipartRaw(contentType, new String(body, ISO));
 
@@ -77,6 +77,9 @@ public class GcsUploadController {
         }
 
         String objectName = (String) metadata.get("name");
+        if (objectName == null) {
+            objectName = nameParam;
+        }
         String objectContentType = (String) metadata.get("contentType");
         if (objectContentType == null) {
             objectContentType = extractPartHeader(rawParts[1], "content-type");
