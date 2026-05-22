@@ -48,6 +48,10 @@ floci-gcp:
       enabled: true
     secretmanager:
       enabled: true
+    kafka:
+      enabled: true
+      mock: false
+      default-image: "redpandadata/redpanda:latest"
   dns:
     extra-suffixes:
   docker:

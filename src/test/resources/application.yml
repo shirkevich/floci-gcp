@@ -13,3 +13,6 @@ floci-gcp:
   services:
     datastore:
       enabled: true
+    kafka:
+      enabled: true
+      mock: true
