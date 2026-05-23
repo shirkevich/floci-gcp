@@ -35,18 +35,18 @@ floci-gcp emulates Google Cloud IAM over REST JSON using the real GCP IAM API.
 
     ```bash
     # Create service account
-    curl -X POST http://localhost:4578/v1/projects/floci-local/serviceAccounts \
+    curl -X POST http://localhost:4588/v1/projects/floci-local/serviceAccounts \
       -H "Content-Type: application/json" \
       -d '{"accountId":"my-sa","serviceAccount":{"displayName":"My SA"}}'
 
     # List service accounts
-    curl http://localhost:4578/v1/projects/floci-local/serviceAccounts
+    curl http://localhost:4588/v1/projects/floci-local/serviceAccounts
 
     # Get service account
-    curl http://localhost:4578/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com
+    curl http://localhost:4588/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com
 
     # Delete service account
-    curl -X DELETE http://localhost:4578/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com
+    curl -X DELETE http://localhost:4588/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com
     ```
 
 ## Service Accounts
@@ -62,12 +62,12 @@ projects/{project}/serviceAccounts/{account}@{project}.iam.gserviceaccount.com
 ```bash
 # Create key
 curl -X POST \
-  http://localhost:4578/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com/keys \
+  http://localhost:4588/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com/keys \
   -H "Content-Type: application/json" \
   -d '{}'
 
 # List keys
-curl http://localhost:4578/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com/keys
+curl http://localhost:4588/v1/projects/floci-local/serviceAccounts/my-sa@floci-local.iam.gserviceaccount.com/keys
 ```
 
 ## IAM Policy Bindings
@@ -79,17 +79,30 @@ gcloud secrets add-iam-policy-binding my-secret \
     --role="roles/secretmanager.secretAccessor"
 ```
 
+## Sign Blob (V4 Signed URLs)
+
+The IAM `SignBlob` endpoint is used by the GCS SDK to generate V4 pre-signed URLs:
+
+```java
+URL signedUrl = storage.signUrl(
+    BlobInfo.newBuilder("my-bucket", "hello.txt").build(),
+    15, TimeUnit.MINUTES,
+    Storage.SignUrlOption.withV4Signature());
+```
+
+`SignBlob` accepts the bytes to sign and returns a stub signature, which is sufficient for local development.
+
 ## Supported Operations
 
 - `CreateServiceAccount`
 - `GetServiceAccount`
 - `ListServiceAccounts`
-- `UpdateServiceAccount`
 - `DeleteServiceAccount`
-- `CreateServiceAccountKey`
+- `CreateServiceAccountKey` (real RSA-2048 key pair; returns JSON key file)
 - `GetServiceAccountKey`
 - `ListServiceAccountKeys`
 - `DeleteServiceAccountKey`
 - `GetIamPolicy`
 - `SetIamPolicy`
 - `TestIamPermissions`
+- `SignBlob`

@@ -11,7 +11,7 @@ floci-gcp emulates Google Cloud Secret Manager over gRPC and REST using the real
 ## Emulator Variable
 
 ```bash
-export SECRET_MANAGER_EMULATOR_HOST=localhost:4578
+export SECRET_MANAGER_EMULATOR_HOST=localhost:4588
 ```
 
 The GCP Secret Manager SDK uses this variable to route requests to floci-gcp instead of `secretmanager.googleapis.com`.
@@ -21,7 +21,7 @@ The GCP Secret Manager SDK uses this variable to route requests to floci-gcp ins
 === "gcloud CLI"
 
     ```bash
-    export SECRET_MANAGER_EMULATOR_HOST=localhost:4578
+    export SECRET_MANAGER_EMULATOR_HOST=localhost:4588
     gcloud config set project floci-local
 
     # Create a secret
@@ -41,7 +41,7 @@ The GCP Secret Manager SDK uses this variable to route requests to floci-gcp ins
 
     ```java
     ManagedChannel channel = ManagedChannelBuilder
-        .forTarget("localhost:4578")
+        .forTarget("localhost:4588")
         .usePlaintext()
         .build();
 
@@ -84,7 +84,7 @@ The GCP Secret Manager SDK uses this variable to route requests to floci-gcp ins
 
     ```python
     import os
-    os.environ["SECRET_MANAGER_EMULATOR_HOST"] = "localhost:4578"
+    os.environ["SECRET_MANAGER_EMULATOR_HOST"] = "localhost:4588"
 
     from google.cloud import secretmanager
 
@@ -117,7 +117,7 @@ The GCP Secret Manager SDK uses this variable to route requests to floci-gcp ins
 === "Node.js"
 
     ```javascript
-    process.env.SECRET_MANAGER_EMULATOR_HOST = "localhost:4578";
+    process.env.SECRET_MANAGER_EMULATOR_HOST = "localhost:4588";
 
     import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 

@@ -11,7 +11,7 @@ floci-gcp emulates Google Cloud Firestore over gRPC using the real `google.fires
 ## Emulator Variable
 
 ```bash
-export FIRESTORE_EMULATOR_HOST=localhost:4578
+export FIRESTORE_EMULATOR_HOST=localhost:4588
 ```
 
 The GCP Firestore SDK uses this variable to route requests to floci-gcp instead of `firestore.googleapis.com`.
@@ -22,7 +22,7 @@ The GCP Firestore SDK uses this variable to route requests to floci-gcp instead 
 
     ```java
     FirestoreOptions options = FirestoreOptions.newBuilder()
-        .setHost("localhost:4578")
+        .setHost("localhost:4588")
         .setProjectId("floci-local")
         .setCredentials(NoCredentials.getInstance())
         .build();
@@ -50,7 +50,7 @@ The GCP Firestore SDK uses this variable to route requests to floci-gcp instead 
 
     ```python
     import os
-    os.environ["FIRESTORE_EMULATOR_HOST"] = "localhost:4578"
+    os.environ["FIRESTORE_EMULATOR_HOST"] = "localhost:4588"
 
     from google.cloud import firestore
 
@@ -75,7 +75,7 @@ The GCP Firestore SDK uses this variable to route requests to floci-gcp instead 
 === "Node.js"
 
     ```javascript
-    process.env.FIRESTORE_EMULATOR_HOST = "localhost:4578";
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:4588";
 
     import { Firestore } from "@google-cloud/firestore";
 
@@ -97,7 +97,7 @@ The GCP Firestore SDK uses this variable to route requests to floci-gcp instead 
 === "gcloud CLI"
 
     ```bash
-    export FIRESTORE_EMULATOR_HOST=localhost:4578
+    export FIRESTORE_EMULATOR_HOST=localhost:4588
     gcloud config set project floci-local
 
     # Firestore does not have gcloud CLI data commands.

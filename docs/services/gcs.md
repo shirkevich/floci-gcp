@@ -10,12 +10,12 @@ floci-gcp emulates Google Cloud Storage using the real GCP wire protocols:
 | Variable | Default | Description |
 |---|---|---|
 | `FLOCI_GCP_SERVICES_GCS_ENABLED` | `true` | Enable/disable Cloud Storage |
-| `FLOCI_GCP_BASE_URL` | `http://localhost:4578` | Base URL embedded in object URLs and pre-signed URLs |
+| `FLOCI_GCP_BASE_URL` | `http://localhost:4588` | Base URL embedded in object URLs and pre-signed URLs |
 
 ## Emulator Variable
 
 ```bash
-export STORAGE_EMULATOR_HOST=http://localhost:4578
+export STORAGE_EMULATOR_HOST=http://localhost:4588
 ```
 
 GCP Storage SDK clients use this variable to route requests to floci-gcp instead of `storage.googleapis.com`.
@@ -25,7 +25,7 @@ GCP Storage SDK clients use this variable to route requests to floci-gcp instead
 === "gcloud CLI"
 
     ```bash
-    export STORAGE_EMULATOR_HOST=http://localhost:4578
+    export STORAGE_EMULATOR_HOST=http://localhost:4588
 
     # Create a bucket
     gcloud storage buckets create gs://my-bucket
@@ -47,7 +47,7 @@ GCP Storage SDK clients use this variable to route requests to floci-gcp instead
 
     ```java
     Storage storage = StorageOptions.newBuilder()
-        .setHost("http://localhost:4578")
+        .setHost("http://localhost:4588")
         .setProjectId("floci-local")
         .setCredentials(NoCredentials.getInstance())
         .build()
@@ -76,7 +76,7 @@ GCP Storage SDK clients use this variable to route requests to floci-gcp instead
 
     ```python
     import os
-    os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:4578"
+    os.environ["STORAGE_EMULATOR_HOST"] = "http://localhost:4588"
 
     from google.cloud import storage
 
@@ -107,7 +107,7 @@ GCP Storage SDK clients use this variable to route requests to floci-gcp instead
     import { Storage } from "@google-cloud/storage";
 
     const storage = new Storage({
-      apiEndpoint: "http://localhost:4578",
+      apiEndpoint: "http://localhost:4588",
       projectId: "floci-local",
     });
 
@@ -174,19 +174,39 @@ The embedded DNS server resolves `*.localhost.floci.io` to floci-gcp's container
 
 **Bucket management (REST JSON):**
 
-- `CreateBucket`
+- `CreateBucket` (with `location`, `storageClass`, `versioning`, `lifecycle`, `cors`, `retentionPolicy`)
 - `GetBucket`
-- `ListBuckets`
+- `ListBuckets` (with `pageToken` pagination)
+- `UpdateBucket` / `PatchBucket`
 - `DeleteBucket`
-- `PatchBucket` (versioning, lifecycle, labels)
+- `GetBucketIamPolicy` / `SetBucketIamPolicy` / `TestBucketIamPermissions`
 
-**Object operations (REST XML):**
+**Bucket ACLs (REST JSON):**
+
+- `ListBucketAcl` / `CreateBucketAcl`
+- `GetBucketAcl` / `UpdateBucketAcl` / `DeleteBucketAcl`
+- `ListDefaultObjectAcl` / `CreateDefaultObjectAcl`
+- `GetDefaultObjectAcl` / `UpdateDefaultObjectAcl` / `DeleteDefaultObjectAcl`
+
+**Object operations (REST XML + REST JSON):**
 
 - `PutObject` (simple and multipart/resumable upload)
 - `GetObject`
 - `DeleteObject`
-- `ListObjects` / `ListObjectsV2`
+- `ListObjects` (with `pageToken`, `prefix`, `delimiter` pagination)
 - `CopyObject`
 - `HeadObject`
-- `GetObjectAcl` / `PutObjectAcl`
-- Pre-signed GET/PUT URLs
+- `PatchObject` (update metadata: `contentType`, `contentDisposition`, `contentEncoding`, `contentLanguage`, custom metadata)
+- `ComposeObject` (concatenate up to 32 source objects)
+- Pre-signed GET/PUT URLs (V4 signature via IAM `SignBlob`)
+
+**Object ACLs (REST JSON):**
+
+- `ListObjectAcl` / `CreateObjectAcl`
+- `GetObjectAcl` / `UpdateObjectAcl` / `DeleteObjectAcl`
+
+**Conditional requests (preconditions):**
+
+- `ifGenerationMatch` / `ifGenerationNotMatch`
+- `ifMetagenerationMatch` / `ifMetagenerationNotMatch`
+- Returns HTTP 412 on precondition failure

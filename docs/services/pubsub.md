@@ -11,7 +11,7 @@ floci-gcp emulates Google Cloud Pub/Sub over gRPC using the real `google.pubsub.
 ## Emulator Variable
 
 ```bash
-export PUBSUB_EMULATOR_HOST=localhost:4578
+export PUBSUB_EMULATOR_HOST=localhost:4588
 ```
 
 GCP Pub/Sub SDK clients use this variable to route requests to floci-gcp instead of `pubsub.googleapis.com`.
@@ -21,7 +21,7 @@ GCP Pub/Sub SDK clients use this variable to route requests to floci-gcp instead
 === "gcloud CLI"
 
     ```bash
-    export PUBSUB_EMULATOR_HOST=localhost:4578
+    export PUBSUB_EMULATOR_HOST=localhost:4588
     gcloud config set project floci-local
 
     # Create topic and subscription
@@ -39,7 +39,7 @@ GCP Pub/Sub SDK clients use this variable to route requests to floci-gcp instead
 
     ```java
     ManagedChannel channel = ManagedChannelBuilder
-        .forTarget("localhost:4578")
+        .forTarget("localhost:4588")
         .usePlaintext()
         .build();
 
@@ -103,7 +103,7 @@ GCP Pub/Sub SDK clients use this variable to route requests to floci-gcp instead
 
     ```python
     import os
-    os.environ["PUBSUB_EMULATOR_HOST"] = "localhost:4578"
+    os.environ["PUBSUB_EMULATOR_HOST"] = "localhost:4588"
 
     from google.cloud import pubsub_v1
 
@@ -192,5 +192,6 @@ subscriptionAdminClient.seek(SeekRequest.newBuilder()
 - `CreateSnapshot`
 - `GetSnapshot`
 - `ListSnapshots`
+- `UpdateSnapshot`
 - `DeleteSnapshot`
 - `Seek`

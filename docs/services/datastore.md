@@ -11,7 +11,7 @@ floci-gcp emulates Google Cloud Datastore over gRPC using the real `google.datas
 ## Emulator Variable
 
 ```bash
-export DATASTORE_EMULATOR_HOST=localhost:4578
+export DATASTORE_EMULATOR_HOST=localhost:4588
 ```
 
 The GCP Datastore SDK uses this variable to route requests to floci-gcp instead of `datastore.googleapis.com`.
@@ -22,7 +22,7 @@ The GCP Datastore SDK uses this variable to route requests to floci-gcp instead 
 
     ```java
     DatastoreOptions options = DatastoreOptions.newBuilder()
-        .setHost("http://localhost:4578")
+        .setHost("http://localhost:4588")
         .setProjectId("floci-local")
         .setCredentials(NoCredentials.getInstance())
         .build();
@@ -58,7 +58,7 @@ The GCP Datastore SDK uses this variable to route requests to floci-gcp instead 
 
     ```python
     import os
-    os.environ["DATASTORE_EMULATOR_HOST"] = "localhost:4578"
+    os.environ["DATASTORE_EMULATOR_HOST"] = "localhost:4588"
 
     from google.cloud import datastore
 
@@ -85,7 +85,7 @@ The GCP Datastore SDK uses this variable to route requests to floci-gcp instead 
 === "Node.js"
 
     ```javascript
-    process.env.DATASTORE_EMULATOR_HOST = "localhost:4578";
+    process.env.DATASTORE_EMULATOR_HOST = "localhost:4588";
 
     import { Datastore } from "@google-cloud/datastore";
 
@@ -110,7 +110,7 @@ The GCP Datastore SDK uses this variable to route requests to floci-gcp instead 
 === "gcloud CLI"
 
     ```bash
-    export DATASTORE_EMULATOR_HOST=localhost:4578
+    export DATASTORE_EMULATOR_HOST=localhost:4588
     gcloud config set project floci-local
 
     # Use gcloud datastore operations
@@ -140,11 +140,32 @@ datastore.runInTransaction(callable);
 
 Datastore requires indexes for composite queries (queries with multiple inequality filters or `ORDER BY` on a field that's not the sort field). In the emulator, basic indexes are created automatically; complex composite indexes can be defined in `datastore.indexes.yaml`.
 
+## GQL Queries
+
+Datastore supports GQL (Google Query Language) syntax:
+
+```java
+Query<Entity> query = Query.newGqlQueryBuilder(Query.ResultType.ENTITY,
+    "SELECT * FROM Task WHERE done = @done LIMIT @limit")
+    .setBinding("done", false)
+    .setBinding("limit", 10)
+    .build();
+
+QueryResults<Entity> results = datastore.run(query);
+```
+
+Supported GQL syntax:
+- `SELECT * FROM Kind`
+- `WHERE prop = value` (and `!=`, `<`, `<=`, `>`, `>=`)
+- `WHERE cond1 AND cond2`
+- `LIMIT n` / `OFFSET n`
+- Named bindings (`@name`) and positional bindings (`@1`)
+
 ## Supported Operations
 
 - `Lookup`
-- `RunQuery`
-- `RunAggregationQuery`
+- `RunQuery` (structured query and GQL)
+- `RunAggregationQuery` (COUNT)
 - `BeginTransaction`
 - `Commit`
 - `Rollback`

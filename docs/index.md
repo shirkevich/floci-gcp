@@ -14,13 +14,13 @@ floci-gcp is a fast, free, and open-source local GCP emulator built for develope
 
 | Service | Protocol | Notable features |
 |---|---|---|
-| **Cloud Storage (GCS)** | REST XML + REST JSON | Buckets, objects, multipart upload, versioning, pre-signed URLs |
-| **Pub/Sub** | gRPC + REST | Topics, subscriptions, publish, pull, push delivery, snapshots |
-| **Firestore** | gRPC | Documents, collections, queries, transactions, real-time listeners |
-| **Datastore** | gRPC | Entities, queries, transactions, indexes |
-| **Secret Manager** | gRPC + REST | Secrets, versions, access, IAM bindings |
-| **IAM** | REST | Service accounts, keys, policy bindings |
-| **Managed Kafka** | REST | Clusters, topics, consumer groups (Redpanda-backed) |
+| **Cloud Storage (GCS)** | REST XML + REST JSON | Buckets, objects, multipart upload, object compose, ACLs, bucket IAM, conditional requests, versioning, pre-signed URLs |
+| **Pub/Sub** | gRPC | Topics, subscriptions, publish, pull, streaming pull, push delivery, snapshots, seek |
+| **Firestore** | gRPC | Documents, collections, queries, field transforms, aggregation, transactions, real-time listeners |
+| **Datastore** | HTTP/protobuf | Entities, structured queries, GQL queries, aggregation, transactions |
+| **Secret Manager** | gRPC | Secrets, versions, access, disable/enable/destroy, IAM bindings |
+| **IAM** | REST | Service accounts, RSA-2048 keys, policy bindings, SignBlob (V4 signed URLs) |
+| **Managed Kafka** | REST | Clusters, topics, consumer groups (Redpanda-backed or mock mode) |
 
 ## Why floci-gcp?
 
