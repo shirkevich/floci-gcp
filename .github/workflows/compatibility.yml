@@ -85,13 +85,13 @@ jobs:
       - name: Start floci-gcp
         run: |
           docker run -d --name floci-gcp --network compat-net \
-            -p 4578:4578 \
-            -e FLOCI_GCP_BASE_URL=http://floci-gcp:4578 \
+            -p 4588:4588 \
+            -e FLOCI_GCP_BASE_URL=http://floci-gcp:4588 \
             -e FLOCI_GCP_HOSTNAME=floci-gcp \
             floci-gcp:test
 
       - name: Wait for floci-gcp to be ready
-        run: timeout 60 bash -c 'until curl -sf http://localhost:4578/health >/dev/null 2>&1; do sleep 1; done'
+        run: timeout 60 bash -c 'until curl -sf http://localhost:4588/health >/dev/null 2>&1; do sleep 1; done'
 
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -114,7 +114,7 @@ jobs:
         run: |
           mkdir -p test-results
           docker run --rm --network compat-net \
-            -e FLOCI_GCP_ENDPOINT=http://floci-gcp:4578 \
+            -e FLOCI_GCP_ENDPOINT=http://floci-gcp:4588 \
             -v "$(pwd)/test-results:/results" \
             compat-${{ matrix.test }}
 
