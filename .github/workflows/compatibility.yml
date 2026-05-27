@@ -84,10 +84,14 @@ jobs:
 
       - name: Start floci-gcp
         run: |
+          DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
           docker run -d --name floci-gcp --network compat-net \
             -p 4588:4588 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            --group-add "$DOCKER_GID" \
             -e FLOCI_GCP_BASE_URL=http://floci-gcp:4588 \
             -e FLOCI_GCP_HOSTNAME=floci-gcp \
+            -e FLOCI_GCP_SERVICES_DOCKER_NETWORK=compat-net \
             floci-gcp:test
 
       - name: Wait for floci-gcp to be ready
