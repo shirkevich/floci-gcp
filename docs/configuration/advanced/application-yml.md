@@ -33,6 +33,7 @@ The block below mirrors `src/main/resources/application.yml`.
 ```yaml
 floci-gcp:
   port: 4588
+  max-request-size: 512
   base-url: "http://localhost:4588"  # Used to build GCS object URLs and pre-signed URLs
   # hostname: ""                     # When set, overrides the host in base-url for multi-container Docker
   default-project-id: floci-local
@@ -40,6 +41,8 @@ floci-gcp:
   storage:
     mode: memory                      # memory | persistent | hybrid | wal
     persistent-path: ./data
+    host-persistent-path: ./data
+    prune-volumes-on-delete: false
     wal:
       compaction-interval-ms: 30000
 
@@ -72,6 +75,20 @@ floci-gcp:
       enabled: true
 
     iam:
+      enabled: true
+
+    kafka:
+      enabled: true
+      mock: false
+      default-image: "redpandadata/redpanda:latest"
+
+    cloudtasks:
+      enabled: true
+
+    cloudrun:
+      enabled: true
+
+    cloudfunctions:
       enabled: true
 ```
 

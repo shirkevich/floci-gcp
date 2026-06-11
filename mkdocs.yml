@@ -75,4 +75,6 @@ nav:
     - Secret Manager: services/secret-manager.md
     - IAM: services/iam.md
     - Managed Kafka: services/managed-kafka.md
+    - Cloud Run: services/cloud-run.md
+    - Cloud Functions: services/cloud-functions.md
   - Contributing: contributing.md

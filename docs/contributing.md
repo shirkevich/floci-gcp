@@ -69,7 +69,7 @@ FIX(gcs): uppercase type      # type must be lowercase
 
 ## Adding a New GCP Service
 
-See [AGENT.md](https://github.com/floci-io/floci-gcp/blob/main/AGENT.md) for the full architecture guide.
+See [AGENTS.md](https://github.com/floci-io/floci-gcp/blob/main/AGENTS.md) for the full architecture guide.
 
 Quick summary:
 

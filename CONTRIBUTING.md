@@ -5,7 +5,7 @@ Thank you for your interest in contributing! Floci is a community-driven project
 ## Ways to Contribute
 
 - **Bug reports** — open an issue with a minimal reproduction
-- **Feature requests** — open an issue describing the AWS behavior you need
+- **Feature requests** — open an issue describing the GCP behavior you need
 - **Pull requests** — bug fixes, new service implementations, or improvements
 - **Compatibility tests** — add cases to `./compatibility-tests/`
 
@@ -15,7 +15,7 @@ Thank you for your interest in contributing! Floci is a community-driven project
 
 - Java 25+
 - Maven 3.9+
-- Docker (for integration tests that spin up Lambda/RDS/ElastiCache)
+- Docker (for integration tests that spin up sidecar services such as Managed Kafka)
 
 Any Java 25+ distribution will work. If you need to install it, [SDKMAN](https://sdkman.io/) is a convenient option:
 
@@ -30,9 +30,9 @@ sdk install java 25-open
 This project includes a Maven wrapper, so you don't need to install Maven separately:
 
 ```bash
-git clone https://github.com/floci-io/floci.git
-cd floci
-./mvnw quarkus:dev     # hot reload on port 4566
+git clone https://github.com/floci-io/floci-gcp.git
+cd floci-gcp
+./mvnw quarkus:dev     # hot reload on port 4588
 ```
 
 If you prefer to use your own Maven installation (3.9+), you can use `mvn` instead of `./mvnw`.
@@ -41,8 +41,8 @@ If you prefer to use your own Maven installation (3.9+), you can use `mvn` inste
 
 ```bash
 ./mvnw test                                          # all tests
-./mvnw test -Dtest=SsmIntegrationTest                # single class
-./mvnw test -Dtest=SsmIntegrationTest#putParameter   # single method
+./mvnw test -Dtest=GcsIntegrationTest                # single class
+./mvnw test -Dtest=PubSubIntegrationTest#publishMessage   # single method
 ```
 
 ## Branching Model
@@ -68,14 +68,14 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) �
 ```
 
 - **type** — one of the values in the table below (lowercase)
-- **scope** — optional, in parentheses, identifies the service or area (e.g. `s3`, `dynamodb`, `core`)
+- **scope** — optional, in parentheses, identifies the service or area (e.g. `gcs`, `pubsub`, `core`)
 - **description** — short summary in the imperative mood, no trailing period
 - Append `!` before the colon to signal a breaking change: `feat(api)!:`
 
 | Type | When to use | Version bump |
 |------|-------------|--------------|
-| `feat` | New AWS API action or service | minor |
-| `fix` | Bug fix or AWS compatibility correction | patch |
+| `feat` | New GCP API action or service | minor |
+| `fix` | Bug fix or GCP compatibility correction | patch |
 | `perf` | Performance improvement | patch |
 | `revert` | Reverts a previous commit | patch |
 | `docs` | Documentation only | none |
@@ -90,15 +90,15 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/) �
 ### Valid examples ✅
 
 ```
-feat(dynamodb): add PartiQL ExecuteStatement support
-fix(s3): make us-east-1 bucket creation idempotent
-perf(kinesis): reduce lock contention in shard iterator
+feat(pubsub): add StreamingPull support
+fix(gcs): correct multipart upload final response
+perf(firestore): reduce query lock contention
 chore: release 1.5.16
 docs: update README with new configuration options
-refactor(sqs): extract message visibility logic
-test(kms): add encrypt/decrypt round-trip test
+refactor(pubsub): extract subscription delivery logic
+test(secretmanager): add access secret version round-trip test
 feat!: remove legacy v1 endpoint
-fix(dynamodb)!: correct TransactWriteItems error shape
+fix(datastore)!: correct commit error shape
 ci: add conventional commits lint workflow
 build: bump Quarkus to 3.32.3
 ```
@@ -109,11 +109,11 @@ build: bump Quarkus to 3.32.3
 Add PartiQL support                  # missing type
 Feature: add something               # "Feature" is not a valid type
 feat : space before colon            # space before colon
-feat(dynamodb)add missing colon      # missing colon
-FIX(s3): uppercase type              # type must be lowercase
+feat(pubsub)add missing colon        # missing colon
+FIX(gcs): uppercase type             # type must be lowercase
 feat(my scope): scope has spaces     # scope cannot contain spaces
 fix(): empty scope                   # empty scope
-feat(s3):no space after colon        # missing space after colon
+feat(gcs):no space after colon       # missing space after colon
 wip: still working on this          # "wip" is not a recognised type
 ```
 
@@ -121,29 +121,29 @@ Do not include `Co-Authored-By` trailers for AI tools in commit messages. Attrib
 
 ## Architecture
 
-See [AGENT.md](AGENT.md) for a detailed description of the three-layer architecture (Controller → Service → Storage), the AWS wire protocol mapping, and conventions for adding new services.
+See [AGENTS.md](AGENTS.md) for a detailed description of the three-layer architecture (Controller → Service → Storage), the GCP wire protocol mapping, and conventions for adding new services.
 
-`AGENT.md` is the canonical agent instructions file for this repository. If your coding agent expects a different filename, create a local symlink to `AGENT.md` instead of copying the file.
+`AGENTS.md` is the canonical agent instructions file for this repository. If your coding agent expects a different filename, create a local symlink to `AGENTS.md` instead of copying the file.
 
 ```bash
-ln -s AGENT.md CLAUDE.md
-ln -s AGENT.md GEMINI.md
-ln -s AGENT.md COPILOT.md
+ln -s AGENTS.md CLAUDE.md
+ln -s AGENTS.md GEMINI.md
+ln -s AGENTS.md COPILOT.md
 ```
 
-## Adding a New AWS Service
+## Adding a New GCP Service
 
 1. Create a package under `src/main/java/.../services/<service>/`
-2. Add a Controller (follow the correct protocol — Query, JSON 1.1, REST JSON, or REST XML)
+2. Add a Controller (follow the correct protocol — gRPC, REST JSON, REST XML, or HTTP/protobuf)
 3. Add a Service (`@ApplicationScoped`) and model POJOs
 4. Add config entries in `EmulatorConfig.java` and `application.yml`
-5. Register a `ServiceDescriptor` in `ResolvedServiceCatalog`
+5. Register a `ServiceDescriptor` in `ServiceRegistry`
 6. Wire controller/handler dispatch for the service
 7. Add integration tests in `*IntegrationTest.java`
 
-`ServiceRegistry`, `ServiceEnabledFilter`, and `StorageFactory` now resolve service metadata from the descriptor catalog. Adding a service should not require new service-keyed switch statements in those consumers.
+`ServiceRegistry`, `ServiceEnabledFilter`, and `StorageFactory` should resolve service metadata through existing service descriptors and storage patterns. Adding a service should not require new service-keyed switch statements in those consumers.
 
-Always implement the **real AWS wire protocol** — never invent custom endpoints. The AWS SDK must work against Floci without modification.
+Always implement the **real GCP wire protocol** — never invent custom endpoints. The GCP SDK must work against floci-gcp without modification.
 
 ## Pull Request Guidelines
 

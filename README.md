@@ -100,7 +100,7 @@ All GCP services — gRPC and REST — share a single port (`4588`) via HTTP/2 A
 <details>
 <summary><strong>Real GCP wire protocols</strong></summary>
 
-floci-gcp speaks the same protocols as real GCP: protobuf-over-gRPC for Pub/Sub, Firestore, and Secret Manager; binary HTTP/protobuf for Datastore; REST XML and JSON for Cloud Storage. Existing SDK calls work without modification.
+floci-gcp speaks the same protocols as real GCP: protobuf-over-gRPC for Pub/Sub, Firestore, and Secret Manager; binary HTTP/protobuf for Datastore; REST XML and JSON for Cloud Storage; and REST JSON for management APIs such as Cloud Run and Cloud Functions. Existing SDK calls work without modification.
 
 </details>
 
@@ -134,6 +134,8 @@ GCP's official emulators are fragmented — each service ships its own binary, r
 | Secret Manager | ✅ | ❌ |
 | IAM | ✅ | ❌ |
 | Managed Kafka | ✅ | ❌ |
+| Cloud Run | ✅ | ❌ |
+| Cloud Functions | ✅ | ❌ |
 | Native binary | ✅ | ❌ |
 
 ## Architecture Overview
@@ -150,7 +152,7 @@ flowchart LR
         end
 
         subgraph REST ["REST services"]
-            B["Cloud Storage\nIAM\nDatastore"]
+            B["Cloud Storage\nIAM\nDatastore\nCloud Run\nCloud Functions"]
         end
 
         subgraph Docker ["Docker-backed"]
@@ -177,6 +179,7 @@ floci-gcp emulates GCP services across storage, messaging, identity, and managed
 | Object and document storage | Cloud Storage (GCS), Firestore, Datastore |
 | Messaging | Pub/Sub, Managed Kafka |
 | Security and identity | Secret Manager, IAM |
+| Serverless control planes | Cloud Run, Cloud Functions |
 
 <details>
 <summary>Detailed service notes</summary>
@@ -190,6 +193,8 @@ floci-gcp emulates GCP services across storage, messaging, identity, and managed
 | **Secret Manager** | gRPC | Secrets, versioning, access, `versions/latest` alias, disable/enable/destroy, IAM bindings |
 | **IAM** | REST JSON | Service accounts, RSA-2048 key pairs (JSON key file format), policy bindings, `SignBlob` (V4 signed URLs) |
 | **Managed Kafka** | REST JSON | Clusters, topics, consumer groups; Redpanda-backed or mock mode |
+| **Cloud Run** | REST JSON | Services, IAM policies, revisions, long-running operations; control plane only, no runtime invocation |
+| **Cloud Functions** | REST JSON | Functions, source upload URL generation, long-running operations; control plane only, no runtime invocation |
 
 </details>
 
@@ -562,6 +567,8 @@ All settings are overridable via environment variables (`FLOCI_GCP_` prefix).
 | `FLOCI_GCP_SERVICES_DATASTORE_ENABLED` | `true` | Enable/disable Datastore |
 | `FLOCI_GCP_SERVICES_IAM_ENABLED` | `true` | Enable/disable IAM |
 | `FLOCI_GCP_SERVICES_SECRETMANAGER_ENABLED` | `true` | Enable/disable Secret Manager |
+| `FLOCI_GCP_SERVICES_CLOUDRUN_ENABLED` | `true` | Enable/disable Cloud Run |
+| `FLOCI_GCP_SERVICES_CLOUDFUNCTIONS_ENABLED` | `true` | Enable/disable Cloud Functions |
 | `FLOCI_GCP_SERVICES_KAFKA_ENABLED` | `true` | Enable/disable Managed Kafka |
 | `FLOCI_GCP_SERVICES_KAFKA_MOCK` | `false` | Use mock mode (no Docker; returns `ACTIVE` immediately) |
 | `FLOCI_GCP_DNS_EXTRA_SUFFIXES` | *(unset)* | Extra DNS suffixes for embedded DNS (comma-separated) |

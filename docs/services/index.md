@@ -13,6 +13,8 @@ floci-gcp emulates GCP services on a single port (`4588`). All services use real
 | [Secret Manager](secret-manager.md) | gRPC | `google.cloud.secretmanager.v1.SecretManagerService` |
 | [IAM](iam.md) | REST JSON | `/v1/projects/{project}/serviceAccounts` |
 | [Managed Kafka](managed-kafka.md) | REST JSON | `/v1/projects/{project}/locations/{location}/clusters` |
+| [Cloud Run](cloud-run.md) | REST JSON | `/v2/projects/{project}/locations/{location}/services` |
+| [Cloud Functions](cloud-functions.md) | REST JSON | `/v2/projects/{project}/locations/{location}/functions` |
 
 ## Single-Port Design
 
@@ -35,7 +37,7 @@ export STORAGE_EMULATOR_HOST=http://localhost:4588
 export SECRET_MANAGER_EMULATOR_HOST=localhost:4588
 ```
 
-GCP SDKs automatically bypass credential validation when these variables are set.
+GCP SDKs automatically bypass credential validation when these variables are set. Some REST management SDKs, including Cloud Run and Cloud Functions, do not have emulator environment variables; configure their client endpoint explicitly as `http://localhost:4588` and use no credentials.
 
 For gcloud CLI:
 
