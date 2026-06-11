@@ -111,7 +111,7 @@ class CloudFunctionsRestIntegrationTest {
         String project = "functions-it-validate";
         String location = "us-central1";
 
-        given()
+        String operationName = given()
                 .contentType("application/json")
                 .queryParam("functionId", "fn")
                 .queryParam("validateOnly", true)
@@ -119,12 +119,40 @@ class CloudFunctionsRestIntegrationTest {
                 .when().post("/v2/projects/" + project + "/locations/" + location + "/functions")
                 .then()
                 .statusCode(200)
-                .body("done", equalTo(true));
+                .body("done", equalTo(true))
+                .extract().path("name");
 
         given()
                 .when().get("/v2/projects/" + project + "/locations/" + location + "/functions/fn")
                 .then()
                 .statusCode(404)
                 .body("error.status", equalTo("NOT_FOUND"));
+
+        given()
+                .when().get("/v2/" + operationName)
+                .then()
+                .statusCode(404)
+                .body("error.status", equalTo("NOT_FOUND"));
+
+        given()
+                .when().get("/v2/projects/" + project + "/locations/" + location + "/operations")
+                .then()
+                .statusCode(200)
+                .body("$", anEmptyMap());
+    }
+
+    @Test
+    void generateUploadUrlHonorsForwardedSchemeAndHost() {
+        given()
+                .urlEncodingEnabled(false)
+                .contentType("application/json")
+                .header("X-Forwarded-Proto", "https")
+                .header("X-Forwarded-Host", "functions.example.test")
+                .body("{}")
+                .when().post("/v2/projects/functions-it-forwarded/locations/us-central1/functions:generateUploadUrl")
+                .then()
+                .statusCode(200)
+                .body("uploadUrl", startsWith("https://functions.example.test/"))
+                .body("storageSource.sourceUploadUrl", startsWith("https://functions.example.test/"));
     }
 }

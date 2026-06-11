@@ -118,7 +118,7 @@ public class CloudRunService {
         }
 
         LOG.infof("create Cloud Run service name=%s validateOnly=%s", name, validateOnly);
-        return operations.done(parent, service, service);
+        return done(parent, service, service, validateOnly);
     }
 
     public com.google.cloud.run.v2.Service getService(String name) {
@@ -157,7 +157,7 @@ public class CloudRunService {
                     .forEach(revisionStore::delete);
         }
         LOG.infof("delete Cloud Run service name=%s validateOnly=%s", name, validateOnly);
-        return operations.done(parentFromName(name), deleted, deleted);
+        return done(parentFromName(name), deleted, deleted, validateOnly);
     }
 
     public Revision getRevision(String name) {
@@ -265,6 +265,13 @@ public class CloudRunService {
                 .setState(Condition.State.CONDITION_SUCCEEDED)
                 .setLastTransitionTime(now)
                 .build();
+    }
+
+    private Operation done(String parent, com.google.cloud.run.v2.Service response,
+                           com.google.cloud.run.v2.Service metadata, boolean transientOnly) {
+        return transientOnly
+                ? operations.doneTransient(parent, response, metadata)
+                : operations.done(parent, response, metadata);
     }
 
     private static StoredPolicy toStoredPolicy(Policy policy) {

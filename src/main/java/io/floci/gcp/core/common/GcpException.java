@@ -70,4 +70,8 @@ public class GcpException extends RuntimeException {
     public static GcpException unimplemented(String message) {
         return new GcpException(501, "UNIMPLEMENTED", Status.Code.UNIMPLEMENTED, message);
     }
+
+    public static GcpException unavailable(String message) {
+        return new GcpException(503, "UNAVAILABLE", Status.Code.UNAVAILABLE, message);
+    }
 }

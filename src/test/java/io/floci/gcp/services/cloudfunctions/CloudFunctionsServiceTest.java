@@ -8,6 +8,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Message;
 import io.floci.gcp.core.common.GcpException;
+import io.floci.gcp.core.common.ServiceRegistry;
 import io.floci.gcp.core.storage.InMemoryStorage;
 import io.floci.gcp.services.gcs.GcsService;
 import io.floci.gcp.services.operations.LongRunningOperationsService;
@@ -32,6 +33,13 @@ class CloudFunctionsServiceTest {
     void setUp() {
         LongRunningOperationsService operations = mock(LongRunningOperationsService.class);
         when(operations.done(anyString(), any(Message.class), any(Message.class)))
+                .thenAnswer(invocation -> Operation.newBuilder()
+                        .setName(invocation.getArgument(0, String.class) + "/operations/test-op")
+                        .setDone(true)
+                        .setResponse(Any.pack(invocation.getArgument(1, Message.class)))
+                        .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
+                        .build());
+        when(operations.doneTransient(anyString(), any(Message.class), any(Message.class)))
                 .thenAnswer(invocation -> Operation.newBuilder()
                         .setName(invocation.getArgument(0, String.class) + "/operations/test-op")
                         .setDone(true)
@@ -134,5 +142,19 @@ class CloudFunctionsServiceTest {
                 .thenThrow(GcpException.alreadyExists("Bucket already exists"));
 
         assertDoesNotThrow(() -> service.generateUploadUrl("p1", "us-central1", "http://localhost:4588"));
+    }
+
+    @Test
+    void generateUploadUrlRequiresGcsServiceEnabled() {
+        ServiceRegistry registry = mock(ServiceRegistry.class);
+        when(registry.isEnabled("gcs")).thenReturn(false);
+        CloudFunctionsService gated = new CloudFunctionsService(new InMemoryStorage<>(),
+                mock(LongRunningOperationsService.class), gcsService, registry);
+
+        GcpException ex = assertThrows(GcpException.class,
+                () -> gated.generateUploadUrl("p1", "us-central1", "http://localhost:4588"));
+
+        assertEquals("UNAVAILABLE", ex.getGcpStatus());
+        verifyNoInteractions(gcsService);
     }
 }

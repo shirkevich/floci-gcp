@@ -34,6 +34,8 @@ class CloudRunRestIntegrationTest {
                 .then()
                 .statusCode(200)
                 .body("done", equalTo(true))
+                .body("metadata.'@type'", equalTo("type.googleapis.com/google.cloud.run.v2.Service"))
+                .body("metadata.name", equalTo("projects/" + project + "/locations/" + location + "/services/" + serviceId))
                 .body("response.name", equalTo("projects/" + project + "/locations/" + location + "/services/" + serviceId));
 
         given()
@@ -136,7 +138,7 @@ class CloudRunRestIntegrationTest {
         String project = "run-it-validate";
         String location = "us-central1";
 
-        given()
+        String operationName = given()
                 .contentType("application/json")
                 .queryParam("serviceId", "svc")
                 .queryParam("validateOnly", true)
@@ -144,13 +146,26 @@ class CloudRunRestIntegrationTest {
                 .when().post("/v2/projects/" + project + "/locations/" + location + "/services")
                 .then()
                 .statusCode(200)
-                .body("done", equalTo(true));
+                .body("done", equalTo(true))
+                .extract().path("name");
 
         given()
                 .when().get("/v2/projects/" + project + "/locations/" + location + "/services/svc")
                 .then()
                 .statusCode(404)
                 .body("error.status", equalTo("NOT_FOUND"));
+
+        given()
+                .when().get("/v2/" + operationName)
+                .then()
+                .statusCode(404)
+                .body("error.status", equalTo("NOT_FOUND"));
+
+        given()
+                .when().get("/v2/projects/" + project + "/locations/" + location + "/operations")
+                .then()
+                .statusCode(200)
+                .body("$", anEmptyMap());
     }
 
 }

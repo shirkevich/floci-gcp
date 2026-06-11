@@ -26,7 +26,7 @@ Create and delete return completed `google.longrunning.Operation` resources imme
 
 Cloud Run services are metadata only. Creating a service synthesizes the service URL, timestamps, etag, ready condition, traffic status, latest revision fields, and one read-only revision. No container image is pulled and no request-serving runtime is started.
 
-`validateOnly=true` returns a successful operation without storing or deleting resources.
+`validateOnly=true` returns a successful completed operation without storing or deleting resources. Validate-only operations are not retained for later operation get/list calls.
 
 ## SDK Usage
 

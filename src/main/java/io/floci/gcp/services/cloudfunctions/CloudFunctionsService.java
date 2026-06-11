@@ -11,6 +11,7 @@ import com.google.cloud.functions.v2.ServiceConfig;
 import com.google.cloud.functions.v2.StorageSource;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Empty;
+import com.google.protobuf.Message;
 import com.google.protobuf.Timestamp;
 import io.floci.gcp.config.EmulatorConfig;
 import io.floci.gcp.core.common.GcpException;
@@ -71,6 +72,17 @@ public class CloudFunctionsService {
         this.config = null;
     }
 
+    CloudFunctionsService(StorageBackend<String, String> functionStore,
+                          LongRunningOperationsService operations,
+                          GcsService gcsService,
+                          ServiceRegistry serviceRegistry) {
+        this.functionStore = functionStore;
+        this.operations = operations;
+        this.gcsService = gcsService;
+        this.serviceRegistry = serviceRegistry;
+        this.config = null;
+    }
+
     void onStart(@Observes StartupEvent ev) {
         serviceRegistry.register(ServiceDescriptor.builder("cloudfunctions")
                 .enabled(config.services().cloudfunctions().enabled())
@@ -98,7 +110,7 @@ public class CloudFunctionsService {
             functionStore.put(name, ProtoJson.print(function));
         }
         LOG.infof("create Cloud Function name=%s validateOnly=%s", name, validateOnly);
-        return operations.done(parent, function, operationMetadata(name, "create", OperationType.CREATE_FUNCTION, now));
+        return done(parent, function, operationMetadata(name, "create", OperationType.CREATE_FUNCTION, now), validateOnly);
     }
 
     public Function getFunction(String name) {
@@ -129,15 +141,19 @@ public class CloudFunctionsService {
         }
         Timestamp now = timestampNow();
         LOG.infof("delete Cloud Function name=%s validateOnly=%s", name, validateOnly);
-        return operations.done(parentFromName(name), Empty.getDefaultInstance(),
-                operationMetadata(name, "delete", OperationType.DELETE_FUNCTION, now));
+        return done(parentFromName(name), Empty.getDefaultInstance(),
+                operationMetadata(name, "delete", OperationType.DELETE_FUNCTION, now), validateOnly);
     }
 
     public GenerateUploadUrlResponse generateUploadUrl(String project, String location, String baseUrl) {
+        if (serviceRegistry != null && !serviceRegistry.isEnabled("gcs")) {
+            throw GcpException.unavailable("Cloud Functions source upload requires Cloud Storage to be enabled.");
+        }
         String bucket = sourceBucket(project, location);
         String object = "source-" + UUID.randomUUID() + ".zip";
+        String uploadBaseUrl = trimTrailingSlash(baseUrl);
         ensureSourceBucket(bucket, project, location, baseUrl);
-        String uploadUrl = baseUrl + "/" + bucket + "/" + object;
+        String uploadUrl = uploadBaseUrl + "/" + bucket + "/" + object;
         return GenerateUploadUrlResponse.newBuilder()
                 .setUploadUrl(uploadUrl)
                 .setStorageSource(StorageSource.newBuilder()
@@ -197,6 +213,12 @@ public class CloudFunctionsService {
                 .build();
     }
 
+    private Operation done(String parent, Message response, Message metadata, boolean transientOnly) {
+        return transientOnly
+                ? operations.doneTransient(parent, response, metadata)
+                : operations.done(parent, response, metadata);
+    }
+
     private static Timestamp timestampNow() {
         Instant now = Instant.now();
         return Timestamp.newBuilder()
@@ -220,6 +242,10 @@ public class CloudFunctionsService {
         String sanitized = value.toLowerCase().replaceAll("[^a-z0-9._-]", "-");
         sanitized = sanitized.replaceAll("^[^a-z0-9]+", "").replaceAll("[^a-z0-9]+$", "");
         return sanitized.isBlank() ? "gcf-v2-sources" : sanitized;
+    }
+
+    private static String trimTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private static String parent(String project, String location) {

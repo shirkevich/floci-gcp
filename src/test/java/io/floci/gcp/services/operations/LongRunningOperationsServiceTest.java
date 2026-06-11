@@ -65,6 +65,16 @@ class LongRunningOperationsServiceTest {
         assertEquals("NOT_FOUND", ex.getGcpStatus());
     }
 
+    @Test
+    void doneTransientDoesNotPersistOperation() {
+        Operation operation = service.doneTransient("projects/p1/locations/us-central1", service("a"), service("a"));
+
+        assertTrue(operation.getDone());
+        GcpException ex = assertThrows(GcpException.class, () -> service.get(operation.getName()));
+        assertEquals("NOT_FOUND", ex.getGcpStatus());
+        assertEquals(0, service.list("projects/p1/locations/us-central1", 10, null).getOperationsCount());
+    }
+
     private static Service service(String id) {
         return Service.newBuilder()
                 .setName("projects/p1/locations/us-central1/services/" + id)

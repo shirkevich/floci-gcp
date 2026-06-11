@@ -40,6 +40,13 @@ class CloudRunServiceTest {
                         .setResponse(Any.pack(invocation.getArgument(1, Message.class)))
                         .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
                         .build());
+        when(operations.doneTransient(anyString(), any(Message.class), any(Message.class)))
+                .thenAnswer(invocation -> Operation.newBuilder()
+                        .setName(invocation.getArgument(0, String.class) + "/operations/test-op")
+                        .setDone(true)
+                        .setResponse(Any.pack(invocation.getArgument(1, Message.class)))
+                        .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
+                        .build());
         iamService = mock(IamService.class);
         service = new CloudRunService(new InMemoryStorage<>(), new InMemoryStorage<>(), operations, iamService);
     }

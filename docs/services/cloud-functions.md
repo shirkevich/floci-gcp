@@ -22,9 +22,9 @@ Create and delete return completed `google.longrunning.Operation` resources imme
 
 Cloud Functions resources are metadata only. Creating a function synthesizes `ACTIVE` state, default `GEN_2` environment when omitted, URL, timestamps, and Cloud Run service references in `serviceConfig`.
 
-`generateUploadUrl` returns an upload URL backed by the existing GCS XML `PUT /{bucket}/{object}` object path and includes a `storageSource` in the response. Uploaded source archives are stored as inert GCS metadata; no function build or runtime is executed.
+`generateUploadUrl` returns an upload URL backed by the existing GCS XML `PUT /{bucket}/{object}` object path and includes a `storageSource` in the response. Uploaded source archives are stored as inert GCS metadata; no function build or runtime is executed. Cloud Storage must be enabled for source upload URL generation.
 
-`validateOnly=true` returns a successful operation without storing or deleting resources.
+`validateOnly=true` returns a successful completed operation without storing or deleting resources. Validate-only operations are not retained for later operation get/list calls.
 
 ## SDK Usage
 

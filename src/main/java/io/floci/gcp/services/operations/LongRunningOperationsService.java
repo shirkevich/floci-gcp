@@ -34,6 +34,16 @@ public class LongRunningOperationsService {
     }
 
     public Operation done(String parent, Message response, Message metadata) {
+        Operation operation = completed(parent, response, metadata);
+        operationStore.put(operation.getName(), ProtoJson.print(operation));
+        return operation;
+    }
+
+    public Operation doneTransient(String parent, Message response, Message metadata) {
+        return completed(parent, response, metadata);
+    }
+
+    private Operation completed(String parent, Message response, Message metadata) {
         Operation.Builder builder = Operation.newBuilder()
                 .setName(parent + "/operations/" + UUID.randomUUID())
                 .setDone(true);
@@ -43,9 +53,7 @@ public class LongRunningOperationsService {
         if (metadata != null) {
             builder.setMetadata(Any.pack(metadata));
         }
-        Operation operation = builder.build();
-        operationStore.put(operation.getName(), ProtoJson.print(operation));
-        return operation;
+        return builder.build();
     }
 
     public Operation get(String name) {
