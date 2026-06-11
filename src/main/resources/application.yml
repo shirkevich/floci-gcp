@@ -59,6 +59,10 @@ floci-gcp:
       default-image: "redpandadata/redpanda:latest"
     cloudtasks:
       enabled: true
+    cloudrun:
+      enabled: true
+    cloudfunctions:
+      enabled: true
   dns:
     extra-suffixes:
   docker:

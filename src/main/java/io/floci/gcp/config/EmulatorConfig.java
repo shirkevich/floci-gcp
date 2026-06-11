@@ -87,6 +87,10 @@ public interface EmulatorConfig {
         KafkaServiceConfig kafka();
 
         CloudTasksServiceConfig cloudtasks();
+
+        CloudRunServiceConfig cloudrun();
+
+        CloudFunctionsServiceConfig cloudfunctions();
     }
 
     interface GcsServiceConfig {
@@ -133,6 +137,16 @@ public interface EmulatorConfig {
     }
 
     interface CloudTasksServiceConfig {
+        @WithDefault("true")
+        boolean enabled();
+    }
+
+    interface CloudRunServiceConfig {
+        @WithDefault("true")
+        boolean enabled();
+    }
+
+    interface CloudFunctionsServiceConfig {
         @WithDefault("true")
         boolean enabled();
     }

@@ -7,6 +7,12 @@ import com.google.cloud.datastore.Datastore;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
+import com.google.cloud.functions.v2.FunctionServiceClient;
+import com.google.cloud.functions.v2.FunctionServiceSettings;
+import com.google.cloud.run.v2.RevisionsClient;
+import com.google.cloud.run.v2.RevisionsSettings;
+import com.google.cloud.run.v2.ServicesClient;
+import com.google.cloud.run.v2.ServicesSettings;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceSettings;
 import com.google.cloud.storage.Storage;
@@ -126,5 +132,29 @@ public final class TestFixtures {
                 .build();
 
         return CloudTasksClient.create(settings);
+    }
+
+    public static ServicesClient cloudRunServicesClient() throws IOException {
+        ServicesSettings settings = ServicesSettings.newHttpJsonBuilder()
+                .setEndpoint(endpoint())
+                .setCredentialsProvider(NoCredentialsProvider.create())
+                .build();
+        return ServicesClient.create(settings);
+    }
+
+    public static RevisionsClient cloudRunRevisionsClient() throws IOException {
+        RevisionsSettings settings = RevisionsSettings.newHttpJsonBuilder()
+                .setEndpoint(endpoint())
+                .setCredentialsProvider(NoCredentialsProvider.create())
+                .build();
+        return RevisionsClient.create(settings);
+    }
+
+    public static FunctionServiceClient cloudFunctionsClient() throws IOException {
+        FunctionServiceSettings settings = FunctionServiceSettings.newHttpJsonBuilder()
+                .setEndpoint(endpoint())
+                .setCredentialsProvider(NoCredentialsProvider.create())
+                .build();
+        return FunctionServiceClient.create(settings);
     }
 }

@@ -60,6 +60,14 @@
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-tasks</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-run</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-functions</artifactId>
+        </dependency>
 
         <!-- JSON parsing for plain-HTTP tests -->
         <dependency>

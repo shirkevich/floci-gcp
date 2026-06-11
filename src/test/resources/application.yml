@@ -18,3 +18,7 @@ floci-gcp:
       mock: true
     cloudtasks:
       enabled: true
+    cloudrun:
+      enabled: true
+    cloudfunctions:
+      enabled: true

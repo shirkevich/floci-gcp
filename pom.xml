@@ -69,6 +69,24 @@
             <version>2.71.0</version>
         </dependency>
 
+        <!-- Protobuf JSON support for REST services backed by Google proto contracts -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java-util</artifactId>
+        </dependency>
+
+        <!-- Cloud Run v2 proto types for REST JSON control-plane emulation -->
+        <dependency>
+            <groupId>com.google.api.grpc</groupId>
+            <artifactId>proto-google-cloud-run-v2</artifactId>
+        </dependency>
+
+        <!-- Cloud Functions v2 proto types for REST JSON control-plane emulation -->
+        <dependency>
+            <groupId>com.google.api.grpc</groupId>
+            <artifactId>proto-google-cloud-functions-v2</artifactId>
+        </dependency>
+
         <!-- Pub/Sub gRPC stubs (PublisherGrpc, SubscriberGrpc ImplBase) -->
         <dependency>
             <groupId>com.google.api.grpc</groupId>
