@@ -1,11 +1,20 @@
-FROM ghcr.io/opentofu/opentofu:1.12.2 AS opentofu
-
 FROM alpine:3.20
 
-# OpenTofu binary from the official image
-COPY --from=opentofu /usr/local/bin/tofu /usr/local/bin/tofu
+ARG OPENTOFU_VERSION=1.12.2
+ARG TARGETARCH
 
-RUN apk add --no-cache bash curl jq git ncurses
+RUN apk add --no-cache bash curl jq git ncurses unzip ca-certificates \
+    && case "${TARGETARCH}" in \
+        amd64) OPENTOFU_ARCH=amd64 ;; \
+        arm64) OPENTOFU_ARCH=arm64 ;; \
+        *) echo "Unsupported OpenTofu architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL \
+        "https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}/tofu_${OPENTOFU_VERSION}_linux_${OPENTOFU_ARCH}.zip" \
+        -o /tmp/tofu.zip \
+    && unzip /tmp/tofu.zip -d /usr/local/bin tofu \
+    && chmod +x /usr/local/bin/tofu \
+    && rm /tmp/tofu.zip
 
 WORKDIR /app
 
