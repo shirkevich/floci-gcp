@@ -56,6 +56,19 @@ class CloudRunUrlServiceTest {
     }
 
     @Test
+    void parsesServiceNameEndingWithTokenLookingSuffix() {
+        CloudRunUrlService urls = new CloudRunUrlService(config("http://localhost:4588", Optional.empty(), Optional.empty()));
+
+        CloudRunUrlService.ParsedHost parsed = urls
+                .parseHost("my-svc-deadbeefcafe-f64551fcd6f0.us-central1.run.localhost.floci.io:4588")
+                .orElseThrow();
+
+        assertEquals("my-svc-deadbeefcafe", parsed.serviceId());
+        assertEquals("f64551fcd6f0", parsed.projectToken());
+        assertEquals("us-central1", parsed.location());
+    }
+
+    @Test
     void ignoresNonCloudRunHosts() {
         CloudRunUrlService urls = new CloudRunUrlService(config("http://localhost:4588", Optional.empty(), Optional.empty()));
 
