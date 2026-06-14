@@ -27,6 +27,11 @@ variable "cloud_run_label" {
   default = "compat-test"
 }
 
+variable "cloud_run_name" {
+  type    = string
+  default = "floci-compat-run"
+}
+
 variable "cloud_run_env_value" {
   type    = string
   default = "initial"

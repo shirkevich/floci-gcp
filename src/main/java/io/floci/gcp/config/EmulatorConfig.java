@@ -164,6 +164,12 @@ public interface EmulatorConfig {
             @WithDefault("300s")
             Duration requestTimeout();
 
+            @WithDefault("300s")
+            Duration operationTimeout();
+
+            @WithDefault("15s")
+            Duration cleanupTimeout();
+
             @WithDefault("floci-cloudrun")
             String containerNamePrefix();
 

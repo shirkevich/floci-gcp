@@ -43,7 +43,7 @@ resource "google_secret_manager_secret_version" "compat" {
 
 # ── Cloud Run ────────────────────────────────────────────────────────────────
 resource "google_cloud_run_v2_service" "compat" {
-  name                = "floci-compat-run"
+  name                = var.cloud_run_name
   location            = var.region
   deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"

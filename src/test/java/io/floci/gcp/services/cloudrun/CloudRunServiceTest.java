@@ -22,6 +22,7 @@ import io.floci.gcp.services.operations.LongRunningOperationsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -225,6 +226,42 @@ class CloudRunServiceTest {
     }
 
     @Test
+    void executionEnabledRuntimeTimeoutMarksServiceAndOperationFailed() {
+        LongRunningOperationsService operations = operationsMock();
+        Operation pending = Operation.newBuilder()
+                .setName("projects/p1/locations/us-central1/operations/runtime-op")
+                .setDone(false)
+                .build();
+        when(operations.pending(anyString(), any(Message.class))).thenReturn(pending);
+        when(operations.fail(eq(pending.getName()), any(Status.class), any(Service.class)))
+                .thenAnswer(invocation -> Operation.newBuilder()
+                        .setName(pending.getName())
+                        .setDone(true)
+                        .setError(invocation.getArgument(1, Status.class))
+                        .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
+                        .build());
+        CloudRunRuntimeService runtime = mock(CloudRunRuntimeService.class);
+        doAnswer(invocation -> {
+            Thread.sleep(5_000);
+            return null;
+        }).when(runtime).start(anyString(), anyString(), any(Service.class), any(Revision.class));
+        CloudRunService gated = new CloudRunService(new InMemoryStorage<>(), new InMemoryStorage<>(),
+                operations, iamService, cloudRunConfig(true, Duration.ofMillis(25)), runtime);
+
+        Operation operation = gated.createService("p1", "us-central1", "svc",
+                "{\"template\":{\"containers\":[{\"image\":\"gcr.io/p1/svc:latest\"}]}}", false);
+
+        assertFalse(operation.getDone());
+        verify(operations, timeout(1000)).fail(eq(pending.getName()), argThat(status ->
+                status.getCode() == Code.DEADLINE_EXCEEDED_VALUE
+                        && status.getMessage().contains("timed out")), any(Service.class));
+        Service failed = gated.getService("projects/p1/locations/us-central1/services/svc");
+        assertFalse(failed.getReconciling());
+        assertEquals(Condition.State.CONDITION_FAILED, failed.getTerminalCondition().getState());
+        assertTrue(failed.getTerminalCondition().getMessage().contains("timed out"));
+    }
+
+    @Test
     void updateServiceAppliesFieldMaskAndCreatesReadyRevision() {
         service.createService("p1", "us-central1", "svc",
                 "{\"template\":{\"containers\":[{\"image\":\"gcr.io/p1/svc:v1\"}]},\"labels\":{\"env\":\"old\"}}",
@@ -368,6 +405,53 @@ class CloudRunServiceTest {
     }
 
     @Test
+    void executionEnabledDeleteCompletesBeforeRuntimeCleanupFinishes() throws InterruptedException {
+        InMemoryStorage<String, String> serviceStore = new InMemoryStorage<>();
+        InMemoryStorage<String, String> revisionStore = new InMemoryStorage<>();
+        CloudRunService seeded = new CloudRunService(serviceStore, revisionStore, operationsMock(), iamService);
+        seeded.createService("p1", "us-central1", "svc", "{}", false);
+        String name = "projects/p1/locations/us-central1/services/svc";
+        String revision = seeded.getService(name).getLatestReadyRevision();
+        LongRunningOperationsService operations = operationsMock();
+        Operation pending = Operation.newBuilder()
+                .setName("projects/p1/locations/us-central1/operations/delete-op")
+                .setDone(false)
+                .build();
+        CountDownLatch operationCompleted = new CountDownLatch(1);
+        CountDownLatch stopEntered = new CountDownLatch(1);
+        CountDownLatch allowStopToFinish = new CountDownLatch(1);
+        when(operations.pending(anyString(), any(Message.class))).thenReturn(pending);
+        when(operations.complete(eq(pending.getName()), any(Service.class), any(Service.class)))
+                .thenAnswer(invocation -> {
+                    operationCompleted.countDown();
+                    return Operation.newBuilder()
+                            .setName(pending.getName())
+                            .setDone(true)
+                            .setResponse(Any.pack(invocation.getArgument(1, Message.class)))
+                            .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
+                            .build();
+                });
+        CloudRunRuntimeService runtime = mock(CloudRunRuntimeService.class);
+        doAnswer(invocation -> {
+            stopEntered.countDown();
+            assertTrue(allowStopToFinish.await(2, TimeUnit.SECONDS));
+            return null;
+        }).when(runtime).stopService(name);
+        CloudRunService gated = new CloudRunService(serviceStore, revisionStore,
+                operations, iamService, cloudRunConfig(true), runtime);
+
+        Operation operation = gated.deleteService(name, false);
+
+        assertFalse(operation.getDone());
+        assertTrue(operationCompleted.await(1, TimeUnit.SECONDS));
+        assertThrows(GcpException.class, () -> gated.getService(name));
+        assertThrows(GcpException.class, () -> gated.getRevision(revision));
+        assertTrue(stopEntered.await(1, TimeUnit.SECONDS));
+        allowStopToFinish.countDown();
+        verify(runtime, timeout(1000)).stopService(name);
+    }
+
+    @Test
     void listRevisionsPaginatesAndRequiresParentService() {
         service.createService("p1", "us-central1", "svc", "{}", false);
 
@@ -445,12 +529,24 @@ class CloudRunServiceTest {
                         .setResponse(Any.pack(invocation.getArgument(1, Message.class)))
                         .setMetadata(Any.pack(invocation.getArgument(2, Message.class)))
                         .build());
+        when(operations.pending(anyString(), any(Message.class)))
+                .thenAnswer(invocation -> Operation.newBuilder()
+                        .setName(invocation.getArgument(0, String.class) + "/operations/test-op")
+                        .setDone(false)
+                        .setMetadata(Any.pack(invocation.getArgument(1, Message.class)))
+                        .build());
         return operations;
     }
 
     private static EmulatorConfig cloudRunConfig(boolean executionEnabled) {
+        return cloudRunConfig(executionEnabled, Duration.ofSeconds(300));
+    }
+
+    private static EmulatorConfig cloudRunConfig(boolean executionEnabled, Duration operationTimeout) {
         EmulatorConfig config = mock(EmulatorConfig.class, RETURNS_DEEP_STUBS);
         when(config.services().cloudrun().execution().enabled()).thenReturn(executionEnabled);
+        when(config.services().cloudrun().execution().operationTimeout()).thenReturn(operationTimeout);
+        when(config.services().cloudrun().execution().cleanupTimeout()).thenReturn(Duration.ofSeconds(15));
         when(config.effectiveBaseUrl()).thenReturn("http://localhost:4588");
         when(config.hostname()).thenReturn(Optional.empty());
         when(config.services().cloudrun().execution().urlHostSuffix()).thenReturn(Optional.empty());

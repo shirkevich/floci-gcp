@@ -31,12 +31,14 @@ import io.floci.gcp.services.iam.IamService;
 import io.floci.gcp.services.iam.model.StoredPolicy;
 import io.floci.gcp.services.operations.LongRunningOperationsService;
 import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -44,7 +46,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @ApplicationScoped
 public class CloudRunService {
@@ -59,6 +67,26 @@ public class CloudRunService {
     private final EmulatorConfig config;
     private final CloudRunRuntimeService runtimeService;
     private final CloudRunUrlService urlService;
+    private final ExecutorService operationExecutor = Executors.newFixedThreadPool(
+            Math.max(2, Runtime.getRuntime().availableProcessors()),
+            runnable -> {
+                Thread thread = new Thread(runnable, "cloudrun-operation");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private final ScheduledExecutorService operationTimeouts = Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+                Thread thread = new Thread(runnable, "cloudrun-operation-timeout");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private final ExecutorService cleanupExecutor = Executors.newFixedThreadPool(
+            Math.min(4, Math.max(1, Runtime.getRuntime().availableProcessors())),
+            runnable -> {
+                Thread thread = new Thread(runnable, "cloudrun-cleanup");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     @Inject
     public CloudRunService(StorageFactory storageFactory,
@@ -124,6 +152,13 @@ public class CloudRunService {
                 .build());
     }
 
+    @PreDestroy
+    void shutdownOperationExecutor() {
+        operationTimeouts.shutdownNow();
+        operationExecutor.shutdownNow();
+        cleanupExecutor.shutdownNow();
+    }
+
     public Operation createService(String project, String location, String serviceId,
                                    String body, boolean validateOnly) {
         String parent = parent(project, location);
@@ -169,10 +204,13 @@ public class CloudRunService {
         }
 
         Operation operation = operations.pending(parent, service);
-        runtimeService.initialize();
+        OperationGuard guard = new OperationGuard(operation.getName());
         com.google.cloud.run.v2.Service storedService = service;
         Revision storedRevision = revision;
-        CompletableFuture.runAsync(() -> startRuntime(project, location, operation.getName(), storedService, storedRevision));
+        submitOperation(guard,
+                () -> startRuntime(project, location, guard, storedService, storedRevision),
+                () -> failRuntimeStart(guard, storedService, storedRevision,
+                        "Cloud Run operation timed out", Code.DEADLINE_EXCEEDED_VALUE));
         return operation;
     }
 
@@ -213,8 +251,13 @@ public class CloudRunService {
         }
 
         Operation operation = operations.pending(parentFromName(name), deleted);
-        runtimeService.initialize();
-        CompletableFuture.runAsync(() -> deleteRuntime(operation.getName(), name, deleted));
+        OperationGuard guard = new OperationGuard(operation.getName());
+        submitOperation(guard,
+                () -> deleteRuntime(guard, name, deleted),
+                () -> guard.fail(Status.newBuilder()
+                        .setCode(Code.DEADLINE_EXCEEDED_VALUE)
+                        .setMessage("Cloud Run operation timed out")
+                        .build(), deleted));
         return operation;
     }
 
@@ -259,11 +302,13 @@ public class CloudRunService {
         }
 
         Operation operation = operations.pending(parentFromName(name), updated);
-        runtimeService.initialize();
+        OperationGuard guard = new OperationGuard(operation.getName());
         Revision storedRevision = revision;
         com.google.cloud.run.v2.Service storedService = updated;
-        CompletableFuture.runAsync(() -> startRuntime(nameProject(name), nameLocation(name),
-                operation.getName(), storedService, storedRevision));
+        submitOperation(guard,
+                () -> startRuntime(nameProject(name), nameLocation(name), guard, storedService, storedRevision),
+                () -> failRuntimeStart(guard, storedService, storedRevision,
+                        "Cloud Run operation timed out", Code.DEADLINE_EXCEEDED_VALUE));
         return operation;
     }
 
@@ -399,10 +444,14 @@ public class CloudRunService {
         return builder.build();
     }
 
-    private void startRuntime(String project, String location, String operationName,
+    private void startRuntime(String project, String location, OperationGuard guard,
                               com.google.cloud.run.v2.Service service, Revision revision) {
         try {
+            runtimeService.initialize();
             runtimeService.start(project, location, service, revision);
+            if (guard.isTerminal()) {
+                return;
+            }
             Timestamp now = timestampNow();
             com.google.cloud.run.v2.Service ready = service.toBuilder()
                     .setLatestReadyRevision(revision.getName())
@@ -420,47 +469,97 @@ public class CloudRunService {
                     .build();
             serviceStore.put(service.getName(), ProtoJson.print(ready));
             revisionStore.put(revision.getName(), ProtoJson.print(readyRevision));
-            runtimeService.stopOtherRevisions(service.getName(), revision.getName());
-            operations.complete(operationName, ready, ready);
+            guard.complete(ready, ready);
+            runCleanupWithTimeout("old revision cleanup service=" + service.getName()
+                    + " revision=" + revision.getName(),
+                    () -> runtimeService.stopOtherRevisions(service.getName(), revision.getName()));
         } catch (Exception e) {
+            if (guard.isTerminal()) {
+                return;
+            }
             String message = e.getMessage() == null ? e.toString() : e.getMessage();
             LOG.warnf(e, "Cloud Run runtime start failed service=%s revision=%s", service.getName(), revision.getName());
-            runtimeService.markFailed(revision.getName(), message);
-            Timestamp now = timestampNow();
-            com.google.cloud.run.v2.Service failed = service.toBuilder()
-                    .setUpdateTime(now)
-                    .setTerminalCondition(failedCondition(now, message))
-                    .clearConditions()
-                    .addConditions(failedCondition(now, message))
-                    .setReconciling(false)
-                    .build();
-            Revision failedRevision = revision.toBuilder()
-                    .setUpdateTime(now)
-                    .clearConditions()
-                    .addConditions(failedCondition(now, message))
-                    .setReconciling(false)
-                    .build();
-            serviceStore.put(service.getName(), ProtoJson.print(failed));
-            revisionStore.put(revision.getName(), ProtoJson.print(failedRevision));
-            operations.fail(operationName, Status.newBuilder()
-                    .setCode(Code.INTERNAL_VALUE)
-                    .setMessage(message)
-                    .build(), failed);
+            failRuntimeStart(guard, service, revision, message, Code.INTERNAL_VALUE);
         }
     }
 
-    private void deleteRuntime(String operationName, String name, com.google.cloud.run.v2.Service deleted) {
+    private void deleteRuntime(OperationGuard guard, String name, com.google.cloud.run.v2.Service deleted) {
         try {
-            runtimeService.stopService(name);
+            runtimeService.initialize();
             deleteMetadata(name);
-            operations.complete(operationName, deleted, deleted);
+            guard.complete(deleted, deleted);
         } catch (Exception e) {
+            if (guard.isTerminal()) {
+                return;
+            }
             String message = e.getMessage() == null ? e.toString() : e.getMessage();
-            LOG.warnf(e, "Cloud Run runtime delete failed service=%s", name);
-            operations.fail(operationName, Status.newBuilder()
+            LOG.warnf(e, "Cloud Run service delete failed service=%s", name);
+            guard.fail(Status.newBuilder()
                     .setCode(Code.INTERNAL_VALUE)
                     .setMessage(message)
                     .build(), deleted);
+            return;
+        }
+
+        runCleanupWithTimeout("runtime cleanup service=" + name, () -> runtimeService.stopService(name));
+    }
+
+    private void submitOperation(OperationGuard guard, Runnable work, Runnable onTimeout) {
+        Future<?> future = operationExecutor.submit(work);
+        Duration timeout = operationTimeout();
+        operationTimeouts.schedule(() -> {
+            if (guard.isTerminal()) {
+                return;
+            }
+            LOG.warnf("Cloud Run operation timed out operation=%s timeout=%s", guard.operationName(), timeout);
+            try {
+                onTimeout.run();
+            } finally {
+                future.cancel(true);
+            }
+        }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    private void failRuntimeStart(OperationGuard guard,
+                                  com.google.cloud.run.v2.Service service,
+                                  Revision revision,
+                                  String message,
+                                  int code) {
+        runtimeService.markFailed(revision.getName(), message);
+        Timestamp now = timestampNow();
+        com.google.cloud.run.v2.Service failed = service.toBuilder()
+                .setUpdateTime(now)
+                .setTerminalCondition(failedCondition(now, message))
+                .clearConditions()
+                .addConditions(failedCondition(now, message))
+                .setReconciling(false)
+                .build();
+        Revision failedRevision = revision.toBuilder()
+                .setUpdateTime(now)
+                .clearConditions()
+                .addConditions(failedCondition(now, message))
+                .setReconciling(false)
+                .build();
+        serviceStore.put(service.getName(), ProtoJson.print(failed));
+        revisionStore.put(revision.getName(), ProtoJson.print(failedRevision));
+        guard.fail(Status.newBuilder()
+                .setCode(code)
+                .setMessage(message)
+                .build(), failed);
+    }
+
+    private void runCleanupWithTimeout(String description, Runnable cleanup) {
+        Future<?> future = cleanupExecutor.submit(cleanup);
+        try {
+            future.get(cleanupTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            LOG.warnf("Cloud Run cleanup timed out: %s timeout=%s", description, cleanupTimeout());
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            LOG.warnf(e, "Cloud Run cleanup failed: %s", description);
         }
     }
 
@@ -638,6 +737,20 @@ public class CloudRunService {
                 && config.services().cloudrun().execution().enabled();
     }
 
+    private Duration operationTimeout() {
+        if (config == null) {
+            return Duration.ofSeconds(300);
+        }
+        return config.services().cloudrun().execution().operationTimeout();
+    }
+
+    private Duration cleanupTimeout() {
+        if (config == null) {
+            return Duration.ofSeconds(15);
+        }
+        return config.services().cloudrun().execution().cleanupTimeout();
+    }
+
     private String invocationUri(String project, String location, String serviceId) {
         return urlService.invocationUri(project, location, serviceId);
     }
@@ -788,4 +901,33 @@ public class CloudRunService {
     }
 
     public record InvocationRoute(String project, String location, String serviceId) {}
+
+    private final class OperationGuard {
+        private final String operationName;
+        private final AtomicBoolean terminal = new AtomicBoolean(false);
+
+        private OperationGuard(String operationName) {
+            this.operationName = operationName;
+        }
+
+        private String operationName() {
+            return operationName;
+        }
+
+        private boolean isTerminal() {
+            return terminal.get();
+        }
+
+        private void complete(com.google.protobuf.Message response, com.google.protobuf.Message metadata) {
+            if (terminal.compareAndSet(false, true)) {
+                operations.complete(operationName, response, metadata);
+            }
+        }
+
+        private void fail(Status error, com.google.protobuf.Message metadata) {
+            if (terminal.compareAndSet(false, true)) {
+                operations.fail(operationName, error, metadata);
+            }
+        }
+    }
 }

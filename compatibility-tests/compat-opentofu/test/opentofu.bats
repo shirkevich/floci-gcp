@@ -181,6 +181,28 @@ setup() {
     [[ "$result" == *'floci-compat-run-tofu/revisions/floci-compat-run-tofu-00002'* ]]
 }
 
+@test "OpenTofu: Cloud Run service replacement destroy completes" {
+    if [ "${FLOCI_GCP_CLOUDRUN_EXECUTION_ENABLED:-false}" != "true" ]; then
+        skip "Cloud Run execution is not enabled"
+    fi
+
+    run tofu apply \
+        -var="endpoint=${FLOCI_ENDPOINT}" \
+        -var="project=${FLOCI_PROJECT}" \
+        -var="cloud_run_name=floci-compat-run-tofu-replaced" \
+        -var="cloud_run_label=compat-replaced" \
+        -var="cloud_run_env_value=replaced" \
+        -input=false -auto-approve -no-color
+    assert_success
+
+    run gcp_curl "${FLOCI_ENDPOINT}/v2/projects/${FLOCI_PROJECT}/locations/us-central1/services/floci-compat-run-tofu"
+    assert_failure
+
+    run gcp_curl "${FLOCI_ENDPOINT}/v2/projects/${FLOCI_PROJECT}/locations/us-central1/services/floci-compat-run-tofu-replaced"
+    assert_success
+    assert_output --partial 'floci-compat-run-tofu-replaced'
+}
+
 # ── State Integrity ───────────────────────────────────────────────────────────
 
 @test "OpenTofu: all six resources tracked in state" {
