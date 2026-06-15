@@ -36,7 +36,7 @@ When execution is disabled, create, update, and delete return completed `google.
 
 By default Cloud Run services are metadata only. Creating a service synthesizes the service URL, timestamps, etag, ready condition, traffic status, latest revision fields, and one read-only revision. No container image is pulled and no request-serving runtime is started.
 
-Execution is experimental and opt-in with `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_ENABLED=true`. Set `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_MOCK=true` to keep services metadata-only even when the execution flag is enabled. In non-mock execution mode, image-based service creation starts one Docker container for the created revision, injects `PORT`, `K_SERVICE`, `K_REVISION`, and `K_CONFIGURATION`, waits for the ingress TCP port, and returns a deterministic app-root invocation URL on the floci-gcp front door:
+Execution is experimental and opt-in with `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_ENABLED=true`. Set `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_MOCK=true` to keep services metadata-only even when the execution flag is enabled. Mock execution does not start Docker containers or apply execution-mode template validation. In non-mock execution mode, image-based service creation starts one Docker container for the created revision, injects `PORT`, `K_SERVICE`, `K_REVISION`, and `K_CONFIGURATION`, waits for the ingress TCP port, and returns a deterministic app-root invocation URL on the floci-gcp front door:
 
 ```text
 http://{service}-{project-token}.{location}.run.localhost.floci.io:4588
