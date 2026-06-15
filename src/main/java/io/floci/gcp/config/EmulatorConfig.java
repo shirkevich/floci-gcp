@@ -193,6 +193,9 @@ public interface EmulatorConfig {
         @WithDefault("unix:///var/run/docker.sock")
         String dockerHost();
 
+        @WithDefault("30s")
+        Duration apiTimeout();
+
         Optional<String> dockerConfigPath();
     }
 

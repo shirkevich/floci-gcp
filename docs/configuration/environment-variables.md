@@ -110,6 +110,7 @@ These variables control the Docker daemon used by floci-gcp's embedded DNS and s
 |---|---|---|
 | `FLOCI_GCP_DOCKER_DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker daemon socket path or TCP address |
 | `FLOCI_GCP_DOCKER_DOCKER_CONFIG_PATH` | _(none)_ | Path to a directory containing Docker's `config.json` for registry auth |
+| `FLOCI_GCP_DOCKER_API_TIMEOUT` | `30s` | Per-call Docker API timeout before floci-gcp resets the Docker client |
 | `FLOCI_GCP_DOCKER_LOG_MAX_SIZE` | `10m` | Log rotation max size for spawned containers |
 | `FLOCI_GCP_DOCKER_LOG_MAX_FILE` | `3` | Number of rotated log files to keep |
 

@@ -35,6 +35,7 @@ class CloudRunExecutionRestIntegrationTest {
         deleteServiceIfPresent("run-exec-it", "us-central1", "nginx");
         deleteServiceIfPresent("run-exec-gcs", "us-central1", "nginx-gcs");
         deleteServiceIfPresent("run-exec-gcs-write", "us-central1", "nginx-gcs-write");
+        deleteServiceIfPresent("run-exec-gcs-replace", "us-central1", "nginx-gcs-replace");
     }
 
     @Test
@@ -72,19 +73,9 @@ class CloudRunExecutionRestIntegrationTest {
                 .extract().path("response.uri");
 
         URI uri = URI.create(serviceUri);
-        given()
-                .header("Host", uri.getAuthority())
-                .when().get("/?probe=1")
-                .then()
-                .statusCode(200)
-                .body(containsString("Welcome to nginx"));
-
-        given()
-                .header("X-Cloud-Run-Test", "execution")
-                .when().get(invocationPath + "/?probe=1")
-                .then()
-                .statusCode(200)
-                .body(containsString("Welcome to nginx"));
+        assertHttpEventuallyContains("/?probe=1", Map.of("Host", uri.getAuthority()), "Welcome to nginx");
+        assertHttpEventuallyContains(invocationPath + "/?probe=1", Map.of("X-Cloud-Run-Test", "execution"),
+                "Welcome to nginx");
 
         String deleteOperation = given()
                 .when().delete(servicePath)
@@ -167,12 +158,41 @@ class CloudRunExecutionRestIntegrationTest {
                 .extract().path("response.uri");
 
         URI uri = URI.create(serviceUri);
+        assertHttpEventuallyContains("/", Map.of("Host", uri.getAuthority()), "hello from gcs volume");
+    }
+
+    @Test
+    void replacesSameNameServiceWithGcsVolume() {
+        String project = "run-exec-gcs-replace";
+        String location = "us-central1";
+        String serviceId = "nginx-gcs-replace";
+        String bucket = "run-exec-gcs-replace-volume";
+
         given()
-                .header("Host", uri.getAuthority())
-                .when().get("/")
+                .contentType("application/json")
+                .body("{\"name\":\"" + bucket + "\",\"location\":\"US\"}")
+                .when().post("/storage/v1/b?project=" + project)
+                .then()
+                .statusCode(200);
+        uploadObject(bucket, "index.html", "replacement generation one");
+
+        String firstUri = createGcsVolumeService(project, location, serviceId, bucket);
+        URI first = URI.create(firstUri);
+        assertHttpEventuallyContains("/", Map.of("Host", first.getAuthority()), "replacement generation one");
+
+        String deleteOperation = given()
+                .when().delete(servicePath(project, location, serviceId))
                 .then()
                 .statusCode(200)
-                .body(containsString("hello from gcs volume"));
+                .body("done", nullValue())
+                .extract().path("name");
+        waitOperation(deleteOperation).then().statusCode(200).body("done", equalTo(true));
+
+        uploadObject(bucket, "index.html", "replacement generation two");
+
+        String secondUri = createGcsVolumeService(project, location, serviceId, bucket);
+        URI second = URI.create(secondUri);
+        assertHttpEventuallyContains("/", Map.of("Host", second.getAuthority()), "replacement generation two");
     }
 
     @Test
@@ -228,12 +248,7 @@ class CloudRunExecutionRestIntegrationTest {
                 .extract().path("response.uri");
 
         URI uri = URI.create(serviceUri);
-        given()
-                .header("Host", uri.getAuthority())
-                .when().get("/")
-                .then()
-                .statusCode(200)
-                .body(containsString("synced from writable volume"));
+        assertHttpEventuallyContains("/", Map.of("Host", uri.getAuthority()), "synced from writable volume");
 
         String deleteOperation = given()
                 .when().delete(servicePath(project, location, serviceId))
@@ -255,6 +270,58 @@ class CloudRunExecutionRestIntegrationTest {
         if (delete.statusCode() == 200) {
             waitOperation(delete.path("name"));
         }
+    }
+
+    private static String createGcsVolumeService(String project, String location, String serviceId, String bucket) {
+        String operationName = given()
+                .contentType("application/json")
+                .queryParam("serviceId", serviceId)
+                .body(gcsVolumeServiceBody(bucket))
+                .when().post("/v2/projects/" + project + "/locations/" + location + "/services")
+                .then()
+                .statusCode(200)
+                .body("done", nullValue())
+                .extract().path("name");
+
+        return waitOperation(operationName)
+                .then()
+                .statusCode(200)
+                .body("done", equalTo(true))
+                .body("response.terminalCondition.state", equalTo("CONDITION_SUCCEEDED"))
+                .extract().path("response.uri");
+    }
+
+    private static String gcsVolumeServiceBody(String bucket) {
+        return """
+                {
+                  "template": {
+                    "volumes": [{
+                      "name": "site",
+                      "gcs": {
+                        "bucket": "%s",
+                        "readOnly": true
+                      }
+                    }],
+                    "containers": [{
+                      "image": "nginx:latest",
+                      "ports": [{"containerPort": 80}],
+                      "volumeMounts": [{
+                        "name": "site",
+                        "mountPath": "/usr/share/nginx/html"
+                      }]
+                    }]
+                  }
+                }
+                """.formatted(bucket);
+    }
+
+    private static void uploadObject(String bucket, String object, String body) {
+        given()
+                .contentType("text/html")
+                .body(body)
+                .when().post("/upload/storage/v1/b/" + bucket + "/o?uploadType=media&name=" + object)
+                .then()
+                .statusCode(200);
     }
 
     private static Response waitOperation(String operationName) {
@@ -287,6 +354,27 @@ class CloudRunExecutionRestIntegrationTest {
             }
         }
         throw new AssertionError("GCS object was not synced; last status="
+                + (last == null ? "none" : last.statusCode()) + " body="
+                + (last == null ? "" : last.asString()));
+    }
+
+    private static void assertHttpEventuallyContains(String path, Map<String, String> headers, String expected) {
+        Response last = null;
+        for (int i = 0; i < 30; i++) {
+            last = given()
+                    .headers(headers)
+                    .when().get(path);
+            if (last.statusCode() == 200 && last.asString().contains(expected)) {
+                return;
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError("Interrupted while waiting for Cloud Run invocation", interrupted);
+            }
+        }
+        throw new AssertionError("Cloud Run invocation did not return expected content; last status="
                 + (last == null ? "none" : last.statusCode()) + " body="
                 + (last == null ? "" : last.asString()));
     }

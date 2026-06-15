@@ -79,6 +79,7 @@ floci-gcp:
     log-max-size: "10m"
     log-max-file: "3"
     docker-host: "unix:///var/run/docker.sock"
+    api-timeout: 30s
   init-hooks:
     shell-executable: /bin/sh
     shutdown-grace-period-seconds: 2

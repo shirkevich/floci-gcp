@@ -412,11 +412,15 @@ public class CloudRunRuntimeService {
 
     private void copyGcsSnapshotToVolume(String bucket, String objectPrefix, String volumeName) {
         byte[] tar = gcsVolumeTar(bucket, objectPrefix);
-        withGcsVolumeHelper(volumeName, helperId -> lifecycleManager.getDockerClient()
-                .copyArchiveToContainerCmd(helperId)
-                .withRemotePath(GCS_VOLUME_HELPER_MOUNT)
-                .withTarInputStream(new ByteArrayInputStream(tar))
-                .exec());
+        withGcsVolumeHelper(volumeName, helperId -> lifecycleManager.runDockerApi(
+                "copy GCS snapshot to Docker volume " + volumeName, () -> {
+                    lifecycleManager.getDockerClient()
+                            .copyArchiveToContainerCmd(helperId)
+                            .withRemotePath(GCS_VOLUME_HELPER_MOUNT)
+                            .withTarInputStream(new ByteArrayInputStream(tar))
+                            .exec();
+                    return null;
+                }));
     }
 
     private void cleanupGcsVolumeMounts(List<CloudRunRuntimeVolumeMount> mounts) {
@@ -554,13 +558,14 @@ public class CloudRunRuntimeService {
 
     private Map<String, byte[]> copyVolumeFiles(String volumeName) {
         Map<String, byte[]> files = new HashMap<>();
-        withGcsVolumeHelper(volumeName, helperId -> {
-            try (InputStream in = lifecycleManager.getDockerClient()
-                    .copyArchiveFromContainerCmd(helperId, GCS_VOLUME_HELPER_MOUNT + "/.")
-                    .exec()) {
-                files.putAll(readTarFiles(in));
-            }
-        });
+        withGcsVolumeHelper(volumeName, helperId -> files.putAll(lifecycleManager.runDockerApi(
+                "copy Docker volume files from " + volumeName, () -> {
+                    try (InputStream in = lifecycleManager.getDockerClient()
+                            .copyArchiveFromContainerCmd(helperId, GCS_VOLUME_HELPER_MOUNT + "/.")
+                            .exec()) {
+                        return readTarFiles(in);
+                    }
+                })));
         return files;
     }
 
@@ -589,7 +594,7 @@ public class CloudRunRuntimeService {
 
     private void removeGcsVolumeHelper(String helperId) {
         try {
-            lifecycleManager.getDockerClient().removeContainerCmd(helperId).withForce(true).exec();
+            lifecycleManager.forceRemove(helperId, null);
         } catch (Exception e) {
             LOG.debugf(e, "Could not remove Cloud Run GCS volume helper container=%s", helperId);
         }
