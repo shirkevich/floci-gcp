@@ -6,7 +6,7 @@ floci-gcp emulates the Cloud Run Admin API v2 control plane over REST JSON using
 |---|---|---|
 | `FLOCI_GCP_SERVICES_CLOUDRUN_ENABLED` | `true` | Enable/disable Cloud Run |
 | `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_ENABLED` | `false` | Enable experimental image-based service execution |
-| `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_RUNTIME` | `docker` | Runtime used for service execution. Only Docker is supported |
+| `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_MOCK` | `false` | Keep execution-mode services metadata-only without starting Docker containers |
 | `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_DEFAULT_PORT` | `8080` | Container port used when the service template omits a port |
 | `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_STARTUP_TIMEOUT` | `240s` | Time to wait for the container TCP port to become reachable |
 | `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_REQUEST_TIMEOUT` | `300s` | Default invocation proxy timeout |
@@ -36,7 +36,7 @@ When execution is disabled, create, update, and delete return completed `google.
 
 By default Cloud Run services are metadata only. Creating a service synthesizes the service URL, timestamps, etag, ready condition, traffic status, latest revision fields, and one read-only revision. No container image is pulled and no request-serving runtime is started.
 
-Execution is experimental and opt-in with `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_ENABLED=true`. In execution mode, image-based service creation starts one Docker container for the created revision, injects `PORT`, `K_SERVICE`, `K_REVISION`, and `K_CONFIGURATION`, waits for the ingress TCP port, and returns a deterministic app-root invocation URL on the floci-gcp front door:
+Execution is experimental and opt-in with `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_ENABLED=true`. Set `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_MOCK=true` to keep services metadata-only even when the execution flag is enabled. In non-mock execution mode, image-based service creation starts one Docker container for the created revision, injects `PORT`, `K_SERVICE`, `K_REVISION`, and `K_CONFIGURATION`, waits for the ingress TCP port, and returns a deterministic app-root invocation URL on the floci-gcp front door:
 
 ```text
 http://{service}-{project-token}.{location}.run.localhost.floci.io:4588
@@ -48,9 +48,9 @@ Generated Cloud Run hosts must route back to the floci-gcp front door. When floc
 
 While the create operation is pending, the stored service has `Ready=CONDITION_PENDING`, `reconciling=true`, and no `latestReadyRevision`. After the runtime port becomes reachable, the operation completes and the service is updated with `Ready=CONDITION_SUCCEEDED` and the ready revision name. If runtime startup fails, the operation fails and both the service and created revision are updated with `Ready=CONDITION_FAILED`, `reconciling=false`, and the startup error message.
 
-PATCH accepts a Cloud Run v2 `Service` body and an optional `updateMask` query parameter. Template-changing updates create a new revision. With execution enabled, the previous ready revision remains invokable while the replacement container starts; after the replacement is ready, `latestReadyRevision` moves to the new revision and older runtime containers for that service are stopped.
+PATCH accepts a Cloud Run v2 `Service` body and an optional `updateMask` query parameter. Template-changing updates create a new revision. `allow_missing` upsert behavior and etag preconditions are not implemented. With execution enabled, the previous ready revision remains invokable while the replacement container starts; after the replacement is ready, `latestReadyRevision` moves to the new revision and older runtime containers for that service are stopped.
 
-Execution mode supports Cloud Run GCS volumes declared with `template.volumes[].gcs` and mounted with container `volumeMounts`. The referenced bucket must already exist in the floci-gcp GCS emulator. At runtime startup, floci-gcp snapshots the bucket's current live objects into a Docker named volume and mounts that volume into the workload container with Docker `NoCopy` enabled. `readOnly=true` becomes a Docker read-only volume mount. `readOnly=false` allows writes into the mounted volume and syncs regular files back to emulator GCS when the runtime container is stopped during service delete or revision replacement. Writes are not live-synced during request handling, so other GCS clients only observe them after runtime cleanup. Snapshot copy uses a short-lived `alpine:3.20` helper container, so Docker must be able to use that image when GCS volumes are mounted.
+Execution mode supports Cloud Run GCS volumes declared with `template.volumes[].gcs` and mounted with container `volumeMounts`. The referenced bucket must already exist in the floci-gcp GCS emulator. At runtime startup, floci-gcp snapshots the bucket's current live objects into a Docker named volume and mounts that volume into the workload container with Docker `NoCopy` enabled. `readOnly=true` becomes a Docker read-only volume mount. `readOnly=false` allows writes into the mounted volume and syncs regular files back to emulator GCS when the runtime container is stopped during service delete or revision replacement. Writable cleanup mirrors the mounted volume back to the bucket prefix, so bucket objects that are no longer present in the mounted filesystem are deleted. Writes are not live-synced during request handling, so other GCS clients only observe them after runtime cleanup. Snapshot copy uses a short-lived `alpine:3.20` helper container, so Docker must be able to use that image when GCS volumes are mounted.
 
 GCS volume `subPath` is supported as a path inside the materialized bucket root. GCS volume `mountOptions` are rejected. Secret, Cloud SQL, emptyDir, NFS, and other volume sources are still unsupported in execution mode.
 

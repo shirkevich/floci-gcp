@@ -63,7 +63,7 @@ floci-gcp:
       enabled: true
       execution:
         enabled: false
-        runtime: docker
+        mock: false
         default-port: 8080
         startup-timeout: 240s
         request-timeout: 300s

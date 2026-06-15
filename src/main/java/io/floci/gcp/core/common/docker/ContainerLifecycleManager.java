@@ -113,13 +113,7 @@ public class ContainerLifecycleManager {
     public void stopAndRemove(String containerId, Closeable logStream) {
         LOG.infov("Stopping container {0}", containerId);
 
-        if (logStream != null) {
-            try {
-                logStream.close();
-            } catch (Exception e) {
-                LOG.debugv("Error closing log stream: {0}", e.getMessage());
-            }
-        }
+        closeLogStream(logStream);
 
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(5).exec();
@@ -137,6 +131,32 @@ public class ContainerLifecycleManager {
             // Already gone
         } catch (Exception e) {
             LOG.warnv("Error removing container {0}: {1}", containerId, e.getMessage());
+        }
+    }
+
+    public void forceRemove(String containerId, Closeable logStream) {
+        LOG.infov("Force-removing container {0}", containerId);
+
+        closeLogStream(logStream);
+
+        try {
+            dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+            LOG.debugv("Force-removed container {0}", containerId);
+        } catch (NotFoundException e) {
+            LOG.debugv("Container {0} not found (already removed)", containerId);
+        } catch (Exception e) {
+            LOG.warnv("Error force-removing container {0}: {1}", containerId, e.getMessage());
+        }
+    }
+
+    private void closeLogStream(Closeable logStream) {
+        if (logStream == null) {
+            return;
+        }
+        try {
+            logStream.close();
+        } catch (Exception e) {
+            LOG.debugv("Error closing log stream: {0}", e.getMessage());
         }
     }
 

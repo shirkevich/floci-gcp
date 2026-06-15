@@ -152,8 +152,8 @@ public interface EmulatorConfig {
             @WithDefault("false")
             boolean enabled();
 
-            @WithDefault("docker")
-            String runtime();
+            @WithDefault("false")
+            boolean mock();
 
             @WithDefault("8080")
             int defaultPort();

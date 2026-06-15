@@ -47,7 +47,7 @@ class CloudRunRuntimeServiceTest {
     void setUp() {
         config = mock(EmulatorConfig.class, RETURNS_DEEP_STUBS);
         when(config.services().dockerNetwork()).thenReturn(Optional.empty());
-        when(config.services().cloudrun().execution().runtime()).thenReturn("docker");
+        when(config.services().cloudrun().execution().mock()).thenReturn(false);
         when(config.services().cloudrun().execution().defaultPort()).thenReturn(8080);
         when(config.services().cloudrun().execution().startupTimeout()).thenReturn(Duration.ofSeconds(1));
         when(config.services().cloudrun().execution().requestTimeout()).thenReturn(Duration.ofSeconds(300));
@@ -226,7 +226,7 @@ class CloudRunRuntimeServiceTest {
         assertThrows(GcpException.class, () -> runtimeService.start("p1", "us-central1", service, revision));
 
         verify(lifecycleManager, never()).removeIfExists(anyString());
-        verify(lifecycleManager).stopAndRemove("new-container-id", null);
+        verify(lifecycleManager).forceRemove("new-container-id", null);
     }
 
     @Test
@@ -256,8 +256,24 @@ class CloudRunRuntimeServiceTest {
 
         service.stopInstances(snapshot);
 
-        verify(lifecycleManager).stopAndRemove("old-container-id", null);
+        verify(lifecycleManager).forceRemove("old-container-id", null);
         assertEquals("new-container-id", store.get(revision).orElseThrow().containerId());
+    }
+
+    @Test
+    void stopInstancesDeletesMatchingRuntimeSnapshotWhenDockerCleanupFails() {
+        InMemoryStorage<String, CloudRunRuntimeInstance> store = new InMemoryStorage<>();
+        String revision = "projects/p1/locations/us-central1/services/svc/revisions/svc-00001";
+        CloudRunRuntimeInstance instance = instance(revision, 12345, "container-id", 1);
+        store.put(revision, instance);
+        CloudRunRuntimeService service = new CloudRunRuntimeService(store, mock(ContainerBuilder.class),
+                lifecycleManager, config);
+        doThrow(new RuntimeException("docker cleanup failed"))
+                .when(lifecycleManager).forceRemove("container-id", null);
+
+        service.stopInstances(List.of(instance));
+
+        assertTrue(store.get(revision).isEmpty());
     }
 
     @Test

@@ -126,6 +126,22 @@ class CloudRunServiceTest {
     }
 
     @Test
+    void executionMockModeDoesNotInvokeRuntime() {
+        CloudRunRuntimeService runtime = mock(CloudRunRuntimeService.class);
+        CloudRunService gated = new CloudRunService(new InMemoryStorage<>(), new InMemoryStorage<>(),
+                operationsMock(), iamService, cloudRunConfig(true, Duration.ofSeconds(300), true), runtime);
+
+        Operation operation = gated.createService("p1", "us-central1", "svc",
+                "{\"template\":{\"containers\":[{\"image\":\"gcr.io/p1/svc:latest\"}]}}", false);
+
+        assertTrue(operation.getDone());
+        Service created = gated.getService("projects/p1/locations/us-central1/services/svc");
+        assertEquals(created.getLatestCreatedRevision(), created.getLatestReadyRevision());
+        assertTrue(created.getUri().startsWith("https://svc-"));
+        verifyNoInteractions(runtime);
+    }
+
+    @Test
     void executionEnabledCreateReturnsPendingAndCompletesAfterRuntimeStart() throws InterruptedException {
         LongRunningOperationsService operations = operationsMock();
         Operation pending = Operation.newBuilder()
@@ -600,8 +616,13 @@ class CloudRunServiceTest {
     }
 
     private static EmulatorConfig cloudRunConfig(boolean executionEnabled, Duration operationTimeout) {
+        return cloudRunConfig(executionEnabled, operationTimeout, false);
+    }
+
+    private static EmulatorConfig cloudRunConfig(boolean executionEnabled, Duration operationTimeout, boolean mockMode) {
         EmulatorConfig config = mock(EmulatorConfig.class, RETURNS_DEEP_STUBS);
         when(config.services().cloudrun().execution().enabled()).thenReturn(executionEnabled);
+        when(config.services().cloudrun().execution().mock()).thenReturn(mockMode);
         when(config.services().cloudrun().execution().operationTimeout()).thenReturn(operationTimeout);
         when(config.services().cloudrun().execution().cleanupTimeout()).thenReturn(Duration.ofSeconds(15));
         when(config.effectiveBaseUrl()).thenReturn("http://localhost:4588");

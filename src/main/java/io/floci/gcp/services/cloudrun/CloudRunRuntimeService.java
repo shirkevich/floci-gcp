@@ -99,9 +99,8 @@ public class CloudRunRuntimeService {
                                          com.google.cloud.run.v2.Service service,
                                          Revision revision) {
         validateSupported(revision);
-        if (!"docker".equals(config.services().cloudrun().execution().runtime())) {
-            throw GcpException.unimplemented("Cloud Run execution runtime is not supported: "
-                    + config.services().cloudrun().execution().runtime());
+        if (config.services().cloudrun().execution().mock()) {
+            throw GcpException.unimplemented("Cloud Run execution mock mode does not start runtime containers");
         }
 
         com.google.cloud.run.v2.Container container = revision.getContainers(0);
@@ -132,7 +131,7 @@ public class CloudRunRuntimeService {
             return ready;
         } catch (RuntimeException e) {
             if (containerId != null) {
-                lifecycleManager.stopAndRemove(containerId, null);
+                lifecycleManager.forceRemove(containerId, null);
             }
             deleteMaterializedGcsVolumes(gcsVolumeMounts);
             throw e;
@@ -266,15 +265,20 @@ public class CloudRunRuntimeService {
 
     private void stopInstance(CloudRunRuntimeInstance instance) {
         try {
-            if (instance.containerId() != null && !instance.containerId().isBlank()) {
-                lifecycleManager.stopAndRemove(instance.containerId(), null);
+            try {
+                if (instance.containerId() != null && !instance.containerId().isBlank()) {
+                    lifecycleManager.forceRemove(instance.containerId(), null);
+                }
+            } catch (Exception e) {
+                LOG.warnf(e, "Cloud Run runtime container cleanup failed revision=%s container=%s",
+                        instance.revisionName(), instance.containerId());
             }
         } finally {
             cleanupGcsVolumeMounts(instance.gcsVolumeMounts());
+            runtimeStore.get(instance.revisionName())
+                    .filter(current -> sameRuntime(current, instance))
+                    .ifPresent(current -> runtimeStore.delete(instance.revisionName()));
         }
-        runtimeStore.get(instance.revisionName())
-                .filter(current -> sameRuntime(current, instance))
-                .ifPresent(current -> runtimeStore.delete(instance.revisionName()));
     }
 
     private static boolean sameRuntime(CloudRunRuntimeInstance current, CloudRunRuntimeInstance expected) {

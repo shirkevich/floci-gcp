@@ -5,10 +5,14 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
@@ -19,6 +23,12 @@ import static org.hamcrest.Matchers.nullValue;
 @QuarkusTest
 @TestProfile(CloudRunExecutionRestIntegrationTest.ExecutionProfile.class)
 class CloudRunExecutionRestIntegrationTest {
+
+    @BeforeAll
+    static void requireDocker() {
+        Assumptions.assumeTrue(dockerAvailable(),
+                "Docker daemon is required for Cloud Run execution integration tests");
+    }
 
     @AfterEach
     void cleanUpService() {
@@ -279,6 +289,25 @@ class CloudRunExecutionRestIntegrationTest {
         throw new AssertionError("GCS object was not synced; last status="
                 + (last == null ? "none" : last.statusCode()) + " body="
                 + (last == null ? "" : last.asString()));
+    }
+
+    private static boolean dockerAvailable() {
+        Process process = null;
+        try {
+            process = new ProcessBuilder("docker", "version", "--format", "{{.Server.Version}}")
+                    .redirectErrorStream(true)
+                    .start();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     public static class ExecutionProfile implements QuarkusTestProfile {
