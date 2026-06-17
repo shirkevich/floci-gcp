@@ -227,9 +227,63 @@ setup() {
     assert_output --partial 'floci-compat-run-tofu-replaced'
 }
 
+# ── Cloud SQL Spot Checks ────────────────────────────────────────────────────
+
+@test "OpenTofu: Cloud SQL PostgreSQL instance created" {
+    instance=$(tofu output -raw sql_instance_name 2>/dev/null)
+    [ -n "$instance" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}"
+    assert_success
+    assert_output --partial '"kind":"sql#instance"'
+    assert_output --partial '"databaseVersion":"POSTGRES_15"'
+    assert_output --partial '"state":"RUNNABLE"'
+}
+
+@test "OpenTofu: Cloud SQL database created" {
+    instance=$(tofu output -raw sql_instance_name 2>/dev/null)
+    database=$(tofu output -raw sql_database_name 2>/dev/null)
+    [ -n "$instance" ]
+    [ -n "$database" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}/databases/${database}"
+    assert_success
+    assert_output --partial '"kind":"sql#database"'
+    assert_output --partial '"name":"appdb"'
+}
+
+@test "OpenTofu: Cloud SQL user created" {
+    instance=$(tofu output -raw sql_instance_name 2>/dev/null)
+    user=$(tofu output -raw sql_user_name 2>/dev/null)
+    [ -n "$instance" ]
+    [ -n "$user" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}/users/${user}"
+    assert_success
+    assert_output --partial '"kind":"sql#user"'
+    assert_output --partial '"name":"app"'
+}
+
+# ── Cloud KMS Spot Checks ─────────────────────────────────────────────────────
+
+@test "OpenTofu: KMS key ring created" {
+    run gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring-tofu"
+    assert_success
+    assert_output --partial 'floci-compat-keyring-tofu'
+}
+
+@test "OpenTofu: KMS crypto key created" {
+    run gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring-tofu/cryptoKeys/floci-compat-key-tofu"
+    assert_success
+    assert_output --partial 'floci-compat-key-tofu'
+    assert_output --partial '"purpose":"ENCRYPT_DECRYPT"'
+}
+
+@test "OpenTofu: KMS crypto key has a primary version" {
+    result=$(gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring-tofu/cryptoKeys/floci-compat-key-tofu/cryptoKeyVersions")
+    [[ "$result" == *'"state":"ENABLED"'* ]]
+}
+
 # ── State Integrity ───────────────────────────────────────────────────────────
 
 @test "OpenTofu: all managed resources tracked in state" {
     count=$(tofu state list 2>/dev/null | wc -l | tr -d ' ')
-    [ "$count" -ge 8 ]
+    [ "$count" -ge 13 ]
 }

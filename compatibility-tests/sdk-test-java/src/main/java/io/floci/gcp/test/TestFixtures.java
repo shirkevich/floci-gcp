@@ -17,8 +17,15 @@ import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
 import com.google.cloud.secretmanager.v1.SecretManagerServiceSettings;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import com.google.cloud.logging.v2.LoggingClient;
+import com.google.cloud.logging.v2.LoggingSettings;
+import com.google.cloud.kms.v1.KeyManagementServiceClient;
+import com.google.cloud.kms.v1.KeyManagementServiceSettings;
 import com.google.cloud.tasks.v2.CloudTasksClient;
 import com.google.cloud.tasks.v2.CloudTasksSettings;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.sqladmin.SQLAdmin;
 
 import java.io.IOException;
 import java.net.URI;
@@ -156,5 +163,59 @@ public final class TestFixtures {
                 .setCredentialsProvider(NoCredentialsProvider.create())
                 .build();
         return FunctionServiceClient.create(settings);
+    }
+
+    public static SQLAdmin sqlAdminClient() {
+        return new SQLAdmin.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance(), request -> {
+        })
+                .setApplicationName("floci-gcp-compat")
+                .setRootUrl(endpoint() + "/")
+                // The generated v1beta4 request classes already include sql/v1beta4/
+                // in their URI templates. Setting it here would produce
+                // /sql/v1beta4/sql/v1beta4/... and miss the emulator routes.
+                .setServicePath("")
+                .build();
+    }
+
+    /**
+     * Creates a Cloud Logging client pointing at the emulator.
+     * No standard emulator env var exists; configure explicitly via plaintext gRPC channel.
+     */
+    public static LoggingClient loggingClient() throws IOException {
+        URI uri = URI.create(endpoint());
+        String host = uri.getHost();
+        int port = uri.getPort() > 0 ? uri.getPort() : 4588;
+
+        LoggingSettings settings = LoggingSettings.newBuilder()
+                .setTransportChannelProvider(
+                        InstantiatingGrpcChannelProvider.newBuilder()
+                                .setEndpoint(host + ":" + port)
+                                .setChannelConfigurator(builder -> builder.usePlaintext())
+                                .build())
+                .setCredentialsProvider(NoCredentialsProvider.create())
+                .build();
+
+        return LoggingClient.create(settings);
+    }
+
+    /**
+     * Creates a Cloud KMS client pointing at the emulator.
+     * No standard emulator env var exists; configure explicitly via plaintext gRPC channel.
+     */
+    public static KeyManagementServiceClient kmsClient() throws IOException {
+        URI uri = URI.create(endpoint());
+        String host = uri.getHost();
+        int port = uri.getPort() > 0 ? uri.getPort() : 4588;
+
+        KeyManagementServiceSettings settings = KeyManagementServiceSettings.newBuilder()
+                .setTransportChannelProvider(
+                        InstantiatingGrpcChannelProvider.newBuilder()
+                                .setEndpoint(host + ":" + port)
+                                .setChannelConfigurator(builder -> builder.usePlaintext())
+                                .build())
+                .setCredentialsProvider(NoCredentialsProvider.create())
+                .build();
+
+        return KeyManagementServiceClient.create(settings);
     }
 }

@@ -229,9 +229,63 @@ setup() {
     assert_output --partial 'floci-compat-run-replaced'
 }
 
+# ── Cloud SQL Spot Checks ────────────────────────────────────────────────────
+
+@test "Terraform: Cloud SQL PostgreSQL instance created" {
+    instance=$(terraform output -raw sql_instance_name 2>/dev/null)
+    [ -n "$instance" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}"
+    assert_success
+    assert_output --partial '"kind":"sql#instance"'
+    assert_output --partial '"databaseVersion":"POSTGRES_15"'
+    assert_output --partial '"state":"RUNNABLE"'
+}
+
+@test "Terraform: Cloud SQL database created" {
+    instance=$(terraform output -raw sql_instance_name 2>/dev/null)
+    database=$(terraform output -raw sql_database_name 2>/dev/null)
+    [ -n "$instance" ]
+    [ -n "$database" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}/databases/${database}"
+    assert_success
+    assert_output --partial '"kind":"sql#database"'
+    assert_output --partial '"name":"appdb"'
+}
+
+@test "Terraform: Cloud SQL user created" {
+    instance=$(terraform output -raw sql_instance_name 2>/dev/null)
+    user=$(terraform output -raw sql_user_name 2>/dev/null)
+    [ -n "$instance" ]
+    [ -n "$user" ]
+    run gcp_curl "${FLOCI_ENDPOINT}/sql/v1beta4/projects/${FLOCI_PROJECT}/instances/${instance}/users/${user}"
+    assert_success
+    assert_output --partial '"kind":"sql#user"'
+    assert_output --partial '"name":"app"'
+}
+
+# ── Cloud KMS Spot Checks ─────────────────────────────────────────────────────
+
+@test "Terraform: KMS key ring created" {
+    run gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring"
+    assert_success
+    assert_output --partial 'floci-compat-keyring'
+}
+
+@test "Terraform: KMS crypto key created" {
+    run gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring/cryptoKeys/floci-compat-key"
+    assert_success
+    assert_output --partial 'floci-compat-key'
+    assert_output --partial '"purpose":"ENCRYPT_DECRYPT"'
+}
+
+@test "Terraform: KMS crypto key has a primary version" {
+    result=$(gcp_curl "${FLOCI_ENDPOINT}/v1/projects/${FLOCI_PROJECT}/locations/${FLOCI_REGION:-us-central1}/keyRings/floci-compat-keyring/cryptoKeys/floci-compat-key/cryptoKeyVersions")
+    [[ "$result" == *'"state":"ENABLED"'* ]]
+}
+
 # ── State Integrity ───────────────────────────────────────────────────────────
 
 @test "Terraform: all managed resources tracked in state" {
     count=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
-    [ "$count" -ge 8 ]
+    [ "$count" -ge 13 ]
 }

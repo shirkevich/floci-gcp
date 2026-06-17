@@ -83,6 +83,9 @@ floci-gcp:
       mock: false
       default-image: "redpandadata/redpanda:latest"
 
+    cloudsql:
+      enabled: true
+
     cloudtasks:
       enabled: true
 

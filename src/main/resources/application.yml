@@ -53,10 +53,16 @@ floci-gcp:
       enabled: true
     secretmanager:
       enabled: true
+    logging:
+      enabled: true
+    kms:
+      enabled: true
     kafka:
       enabled: true
       mock: false
       default-image: "redpandadata/redpanda:latest"
+    cloudsql:
+      enabled: true
     cloudtasks:
       enabled: true
     cloudrun:

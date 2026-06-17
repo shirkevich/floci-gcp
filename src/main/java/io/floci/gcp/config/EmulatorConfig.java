@@ -85,7 +85,13 @@ public interface EmulatorConfig {
 
         SecretManagerServiceConfig secretmanager();
 
+        LoggingServiceConfig logging();
+
+        CloudKmsServiceConfig kms();
+
         KafkaServiceConfig kafka();
+
+        CloudSqlServiceConfig cloudsql();
 
         CloudTasksServiceConfig cloudtasks();
 
@@ -124,6 +130,16 @@ public interface EmulatorConfig {
         boolean enabled();
     }
 
+    interface LoggingServiceConfig {
+        @WithDefault("true")
+        boolean enabled();
+    }
+
+    interface CloudKmsServiceConfig {
+        @WithDefault("true")
+        boolean enabled();
+    }
+
     interface KafkaServiceConfig {
         @WithDefault("true")
         boolean enabled();
@@ -135,6 +151,11 @@ public interface EmulatorConfig {
         String defaultImage();
 
         Optional<String> dockerNetwork();
+    }
+
+    interface CloudSqlServiceConfig {
+        @WithDefault("true")
+        boolean enabled();
     }
 
     interface CloudTasksServiceConfig {

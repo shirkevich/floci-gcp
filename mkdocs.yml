@@ -73,8 +73,11 @@ nav:
     - Firestore: services/firestore.md
     - Datastore: services/datastore.md
     - Secret Manager: services/secret-manager.md
+    - Cloud Logging: services/logging.md
+    - Cloud KMS: services/kms.md
     - IAM: services/iam.md
     - Managed Kafka: services/managed-kafka.md
+    - Cloud SQL for PostgreSQL: services/cloud-sql-postgres.md
     - Cloud Run: services/cloud-run.md
     - Cloud Functions: services/cloud-functions.md
   - Contributing: contributing.md

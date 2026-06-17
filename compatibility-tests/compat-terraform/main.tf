@@ -121,7 +121,55 @@ resource "google_cloud_run_v2_service" "compat" {
   ]
 }
 
+# ── Cloud SQL for PostgreSQL ─────────────────────────────────────────────────
+resource "google_sql_database_instance" "compat" {
+  name             = "floci-compat-postgres"
+  project          = var.project
+  region           = var.region
+  database_version = "POSTGRES_15"
+
+  deletion_protection = false
+
+  settings {
+    tier = "db-custom-1-3840"
+  }
+}
+
+resource "google_sql_database" "compat" {
+  name     = "appdb"
+  project  = var.project
+  instance = google_sql_database_instance.compat.name
+}
+
+resource "google_sql_user" "compat" {
+  name     = "app"
+  project  = var.project
+  instance = google_sql_database_instance.compat.name
+  password = "floci-compat-password"
+}
+
+# ── Cloud KMS ─────────────────────────────────────────────────────────────────
+resource "google_kms_key_ring" "compat" {
+  name     = "floci-compat-keyring"
+  location = var.region
+  project  = var.project
+}
+
+resource "google_kms_crypto_key" "compat" {
+  name     = "floci-compat-key"
+  key_ring = google_kms_key_ring.compat.id
+  purpose  = "ENCRYPT_DECRYPT"
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
+output "key_ring_name" {
+  value = google_kms_key_ring.compat.name
+}
+
+output "crypto_key_name" {
+  value = google_kms_crypto_key.compat.name
+}
+
 output "bucket_name" {
   value = google_storage_bucket.compat.name
 }
@@ -148,4 +196,16 @@ output "cloud_run_service_name" {
 
 output "cloud_run_uri" {
   value = google_cloud_run_v2_service.compat.uri
+}
+
+output "sql_instance_name" {
+  value = google_sql_database_instance.compat.name
+}
+
+output "sql_database_name" {
+  value = google_sql_database.compat.name
+}
+
+output "sql_user_name" {
+  value = google_sql_user.compat.name
 }

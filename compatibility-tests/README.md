@@ -38,30 +38,33 @@ just test-all-iac
 
 | Module | Tool | Framework | Command |
 |---|---|---|---|
-| [`compat-terraform`](compat-terraform/) | Terraform + GCP provider v7+ | BATS | `just test-terraform` |
-| [`compat-opentofu`](compat-opentofu/) | OpenTofu + GCP provider v7+ | BATS | `just test-opentofu` |
+| [`compat-terraform`](compat-terraform/) | Terraform + GCP provider v7.36 | BATS | `just test-terraform` |
+| [`compat-opentofu`](compat-opentofu/) | OpenTofu + GCP provider v7.36 | BATS | `just test-opentofu` |
 
 ## Test Coverage
 
-### SDK tests — 186 tests total
+### SDK tests — 226 tests total
 
 | Test class | GCP service | Java | Python | Node | Go |
 |---|---|:---:|:---:|:---:|:---:|
 | `GcsTest` | Cloud Storage | 5 | 6 | 9 | 9 |
 | `PubSubTest` | Pub/Sub | 6 | 4 | 8 | 7 |
 | `SecretManagerTest` | Secret Manager | 5 | 5 | 6 | 7 |
+| `LoggingTest` | Cloud Logging | 5 | 3 | 3 | 3 |
+| `KmsTest` | Cloud KMS | 8 | 6 | 4 | 4 |
 | `FirestoreTest` | Firestore | 5 | 5 | 6 | 5 |
 | `DatastoreTest` | Datastore | 5 | 5 | 5 | 5 |
 | `IamTest` | IAM | 7 | 5 | 7 | 7 |
 | `KafkaTest` | Managed Kafka | 11 | 9 | 11 | 11 |
-| **Total** | | **44** | **39** | **52** | **51** |
+| `CloudSqlAdminTest` | Cloud SQL for PostgreSQL | 4 | 0 | 0 | 0 |
+| **Total** | | **61** | **48** | **59** | **58** |
 
 ### IaC tests
 
 | Suite | Resources tested |
 |---|---|
-| `compat-terraform` | GCS bucket (with labels), GCS objects, IAM service account, Secret Manager secret/version, Cloud Run v2 service create/update/invoke with GCS volume mount |
-| `compat-opentofu` | GCS bucket (with labels), GCS objects, IAM service account, Secret Manager secret/version, Cloud Run v2 service create/update/invoke with GCS volume mount |
+| `compat-terraform` | GCS bucket (with labels), GCS objects, IAM service account, Secret Manager secret/version, Cloud Run v2 service create/update/invoke with GCS volume mount, Cloud SQL PostgreSQL instance/database/user, KMS key ring + crypto key |
+| `compat-opentofu` | GCS bucket (with labels), GCS objects, IAM service account, Secret Manager secret/version, Cloud Run v2 service create/update/invoke with GCS volume mount, Cloud SQL PostgreSQL instance/database/user, KMS key ring + crypto key |
 
 Each IaC suite runs: `init` → `validate` → `plan` → `apply` → BATS spot-checks → `destroy`.
 
@@ -73,8 +76,8 @@ Each IaC suite runs: `init` → `validate` → `plan` → `apply` → BATS spot-
 - **Node.js 18+** — for `sdk-test-node`
 - **Go 1.21+** — for `sdk-test-go`
 - **just** — task runner
-- **terraform** — for `compat-terraform` BATS tests
-- **tofu** — for `compat-opentofu` BATS tests
+- **terraform** — for `compat-terraform` BATS tests; use a CLI compatible with `hashicorp/google` v7.36
+- **tofu** — for `compat-opentofu` BATS tests; use a CLI compatible with `hashicorp/google` v7.36
 - **bats-core** — for IaC BATS tests (`brew install bats-core`)
 - **Docker** — for Cloud Run execution checks when `FLOCI_GCP_CLOUDRUN_EXECUTION_ENABLED=true`
 
@@ -100,7 +103,7 @@ SECRET_MANAGER_EMULATOR_HOST=localhost:4588
 | `STORAGE_EMULATOR_HOST` | Cloud Storage | `http://host:port` |
 | `SECRET_MANAGER_EMULATOR_HOST` | Secret Manager | `host:port` |
 
-IAM and Managed Kafka have no standard GCP emulator env var — tests connect via `FLOCI_GCP_ENDPOINT` directly.
+IAM, Cloud Logging, Cloud KMS, and Managed Kafka have no standard GCP emulator env var — tests connect via `FLOCI_GCP_ENDPOINT` directly (Cloud Logging and Cloud KMS may optionally be overridden with `LOGGING_EMULATOR_HOST` and `KMS_EMULATOR_HOST` respectively).
 
 ## Running with Docker
 
@@ -125,12 +128,15 @@ docker run --rm \
 
 ## IaC suites — notes
 
-The Terraform and OpenTofu GCP provider (v6) does **not** respect `STORAGE_EMULATOR_HOST` or `PUBSUB_EMULATOR_HOST` for resource management. The suites configure explicit custom endpoints in `provider.tf`:
+The Terraform and OpenTofu GCP provider does **not** respect `STORAGE_EMULATOR_HOST` or `PUBSUB_EMULATOR_HOST` for resource management. The suites configure explicit custom endpoints in `provider.tf`:
 
 ```hcl
 provider "google" {
-  storage_custom_endpoint = "${var.endpoint}/storage/v1/"
-  iam_custom_endpoint     = "${var.endpoint}/"
+  storage_custom_endpoint        = "${var.endpoint}/storage/v1/"
+  iam_custom_endpoint            = "${var.endpoint}/"
+  iam_beta_custom_endpoint       = "${var.endpoint}/v1/"
+  secret_manager_custom_endpoint = "${var.endpoint}/v1/"
+  sql_custom_endpoint            = "${var.endpoint}/sql/v1beta4/"
 }
 ```
 

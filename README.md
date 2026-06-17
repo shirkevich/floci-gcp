@@ -132,6 +132,8 @@ GCP's official emulators are fragmented — each service ships its own binary, r
 | Datastore | ✅ | ✅ |
 | Cloud Storage (GCS) | ✅ | ⚠️ Limited |
 | Secret Manager | ✅ | ❌ |
+| Cloud Logging | ✅ | ❌ |
+| Cloud KMS | ✅ | ❌ |
 | IAM | ✅ | ❌ |
 | Managed Kafka | ✅ | ❌ |
 | Cloud Run | ✅ | ❌ |
@@ -148,7 +150,7 @@ flowchart LR
         Router["HTTP/2 Router\nALPN negotiation"]
 
         subgraph GRPC ["gRPC services"]
-            A["Pub/Sub\nFirestore\nSecret Manager"]
+            A["Pub/Sub\nFirestore\nSecret Manager\nCloud Logging\nCloud KMS"]
         end
 
         subgraph REST ["REST services"]
@@ -178,8 +180,9 @@ floci-gcp emulates GCP services across storage, messaging, identity, and managed
 |---|---|
 | Object and document storage | Cloud Storage (GCS), Firestore, Datastore |
 | Messaging | Pub/Sub, Managed Kafka |
-| Security and identity | Secret Manager, IAM |
+| Security and identity | Secret Manager, Cloud KMS, IAM |
 | Serverless control planes | Cloud Run, Cloud Functions |
+| Observability | Cloud Logging |
 
 <details>
 <summary>Detailed service notes</summary>
@@ -191,6 +194,8 @@ floci-gcp emulates GCP services across storage, messaging, identity, and managed
 | **Firestore** | gRPC | Documents, collections, queries (all operators), field transforms, aggregation (COUNT), transactions, batch writes, real-time listeners (`listen` stream) |
 | **Datastore** | HTTP/protobuf | Entities, structured queries, GQL queries, aggregation (COUNT), transactions, GQL named/positional bindings |
 | **Secret Manager** | gRPC | Secrets, versioning, access, `versions/latest` alias, disable/enable/destroy, IAM bindings |
+| **Cloud Logging** | gRPC + REST JSON | Structured log ingestion (`WriteLogEntries`), read-back (`ListLogEntries`) with a practical filter subset (logName, severity, resource.type, timestamp, labels), `ListLogs`, `DeleteLog`; text/JSON payloads |
+| **Cloud KMS** | gRPC + REST JSON | Key rings, crypto keys, key versions, symmetric encrypt/decrypt (AES-256-GCM), asymmetric sign (EC P-256, RSA PKCS1) and decrypt (RSA-OAEP), `GetPublicKey`, `GenerateRandomBytes`, CRC32C integrity fields |
 | **IAM** | REST JSON | Service accounts, RSA-2048 key pairs (JSON key file format), policy bindings, `SignBlob` (V4 signed URLs) |
 | **Managed Kafka** | REST JSON | Clusters, topics, consumer groups; Redpanda-backed or mock mode |
 | **Cloud Run** | REST JSON | Services, IAM policies, revisions, long-running operations; control plane by default, experimental Docker-backed invocation when enabled |
@@ -572,6 +577,7 @@ All settings are overridable via environment variables (`FLOCI_GCP_` prefix).
 | `FLOCI_GCP_SERVICES_CLOUDRUN_EXECUTION_MOCK` | `false` | Keep Cloud Run execution metadata-only without Docker |
 | `FLOCI_GCP_SERVICES_CLOUDFUNCTIONS_ENABLED` | `true` | Enable/disable Cloud Functions |
 | `FLOCI_GCP_SERVICES_KAFKA_ENABLED` | `true` | Enable/disable Managed Kafka |
+| `FLOCI_GCP_SERVICES_CLOUDSQL_ENABLED` | `true` | Enable/disable Cloud SQL for PostgreSQL |
 | `FLOCI_GCP_SERVICES_KAFKA_MOCK` | `false` | Use mock mode (no Docker; returns `ACTIVE` immediately) |
 | `FLOCI_GCP_DNS_EXTRA_SUFFIXES` | *(unset)* | Extra DNS suffixes for embedded DNS (comma-separated) |
 
