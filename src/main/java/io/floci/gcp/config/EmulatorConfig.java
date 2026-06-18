@@ -3,6 +3,7 @@ package io.floci.gcp.config;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -165,6 +166,36 @@ public interface EmulatorConfig {
     interface CloudRunServiceConfig {
         @WithDefault("true")
         boolean enabled();
+
+        ExecutionConfig execution();
+
+        interface ExecutionConfig {
+            @WithDefault("false")
+            boolean enabled();
+
+            @WithDefault("false")
+            boolean mock();
+
+            @WithDefault("8080")
+            int defaultPort();
+
+            @WithDefault("240s")
+            Duration startupTimeout();
+
+            @WithDefault("300s")
+            Duration requestTimeout();
+
+            @WithDefault("300s")
+            Duration operationTimeout();
+
+            @WithDefault("15s")
+            Duration cleanupTimeout();
+
+            @WithDefault("floci-cloudrun")
+            String containerNamePrefix();
+
+            Optional<String> urlHostSuffix();
+        }
     }
 
     interface CloudFunctionsServiceConfig {
@@ -182,6 +213,9 @@ public interface EmulatorConfig {
 
         @WithDefault("unix:///var/run/docker.sock")
         String dockerHost();
+
+        @WithDefault("30s")
+        Duration apiTimeout();
 
         Optional<String> dockerConfigPath();
     }

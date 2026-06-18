@@ -56,6 +56,7 @@ floci-gcp:
     log-max-size: "10m"
     log-max-file: "3"
     docker-host: unix:///var/run/docker.sock
+    api-timeout: 30s
     docker-config-path: ""
 
   services:
@@ -90,6 +91,16 @@ floci-gcp:
 
     cloudrun:
       enabled: true
+      execution:
+        enabled: false
+        mock: false
+        default-port: 8080
+        startup-timeout: 240s
+        request-timeout: 300s
+        operation-timeout: 300s
+        cleanup-timeout: 15s
+        container-name-prefix: floci-cloudrun
+        url-host-suffix:              # Optional; defaults to hostname, then localhost.floci.io
 
     cloudfunctions:
       enabled: true

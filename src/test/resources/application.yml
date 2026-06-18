@@ -22,5 +22,17 @@ floci-gcp:
       enabled: true
     cloudrun:
       enabled: true
+      execution:
+        enabled: false
+        mock: false
+        default-port: 8080
+        startup-timeout: 240s
+        request-timeout: 300s
+        operation-timeout: 300s
+        cleanup-timeout: 15s
+        container-name-prefix: floci-cloudrun
+        url-host-suffix:
     cloudfunctions:
       enabled: true
+  docker:
+    api-timeout: 30s
