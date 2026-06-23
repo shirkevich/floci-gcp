@@ -46,6 +46,23 @@ class PubSubRestIntegrationTest {
                 .contentType("application/json")
                 .body("""
                         {
+                          "topic": {
+                            "labels": {"app": "orders", "env": "patched"},
+                            "messageRetentionDuration": "1200s"
+                          },
+                          "updateMask": "labels,messageRetentionDuration"
+                        }
+                        """)
+                .when().patch("/v1/projects/" + project + "/topics/" + topic)
+                .then()
+                .statusCode(200)
+                .body("labels.env", equalTo("patched"))
+                .body("messageRetentionDuration", equalTo("1200s"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
                           "topic": "%s",
                           "ackDeadlineSeconds": 10,
                           "messageRetentionDuration": "604800s",
@@ -83,6 +100,31 @@ class PubSubRestIntegrationTest {
                 .body("ackDeadlineSeconds", equalTo(20))
                 .body("labels.sink", equalTo("worker"))
                 .body("bigqueryConfig.table", equalTo(project + ".orders_analytics.order_events"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "subscription": {
+                            "ackDeadlineSeconds": 30,
+                            "labels": {"app": "orders", "sink": "canonical"},
+                            "retainAckedMessages": true,
+                            "bigqueryConfig": {
+                              "table": "%s.orders_analytics.order_events_v2",
+                              "useTableSchema": true
+                            }
+                          },
+                          "updateMask": "ackDeadlineSeconds,labels,retainAckedMessages,bigqueryConfig"
+                        }
+                        """.formatted(project))
+                .when().patch("/v1/projects/" + project + "/subscriptions/" + subscription)
+                .then()
+                .statusCode(200)
+                .body("ackDeadlineSeconds", equalTo(30))
+                .body("labels.sink", equalTo("canonical"))
+                .body("retainAckedMessages", equalTo(true))
+                .body("bigqueryConfig.table", equalTo(project + ".orders_analytics.order_events_v2"))
+                .body("bigqueryConfig.state", equalTo("ACTIVE"));
 
         String payload = Base64.getEncoder().encodeToString("hello from rest".getBytes());
         given()

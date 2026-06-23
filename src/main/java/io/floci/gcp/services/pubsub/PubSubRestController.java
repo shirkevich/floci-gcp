@@ -90,9 +90,10 @@ public class PubSubRestController {
                                 @PathParam("topic") String topicId,
                                 @QueryParam("updateMask") String updateMask,
                                 Map<String, Object> body) {
+        Map<String, Object> topicBody = updateResource(body, "topic");
         StoredTopic topic = service.updateTopic(topicName(project, topicId),
-                stringMap(body, "labels"), stringValue(body, "messageRetentionDuration"),
-                updateMaskPaths(updateMask));
+                stringMap(topicBody, "labels"), stringValue(topicBody, "messageRetentionDuration"),
+                updateMaskPaths(updateMask(updateMask, body)));
         return Response.ok(topicResponse(topic)).build();
     }
 
@@ -173,22 +174,23 @@ public class PubSubRestController {
                                        @PathParam("subscription") String subscriptionId,
                                        @QueryParam("updateMask") String updateMask,
                                        Map<String, Object> body) {
+        Map<String, Object> subscriptionBody = updateResource(body, "subscription");
         StoredSubscription subscription = service.updateSubscription(
                 subscriptionName(project, subscriptionId),
-                intValue(body, "ackDeadlineSeconds"),
-                stringMap(body, "labels"),
-                optionalBooleanValue(body, "retainAckedMessages"),
-                stringValue(body, "messageRetentionDuration"),
-                stringValue(body, "filter"),
-                pushEndpoint(body),
-                objectMap(body, "bigqueryConfig"),
-                objectMap(body, "expirationPolicy"),
-                objectMap(body, "retryPolicy"),
-                deadLetterTopic(body),
-                maxDeliveryAttempts(body) == 0 ? null : maxDeliveryAttempts(body),
-                optionalBooleanValue(body, "enableMessageOrdering"),
-                optionalBooleanValue(body, "enableExactlyOnceDelivery"),
-                updateMaskPaths(updateMask));
+                intValue(subscriptionBody, "ackDeadlineSeconds"),
+                stringMap(subscriptionBody, "labels"),
+                optionalBooleanValue(subscriptionBody, "retainAckedMessages"),
+                stringValue(subscriptionBody, "messageRetentionDuration"),
+                stringValue(subscriptionBody, "filter"),
+                pushEndpoint(subscriptionBody),
+                objectMap(subscriptionBody, "bigqueryConfig"),
+                objectMap(subscriptionBody, "expirationPolicy"),
+                objectMap(subscriptionBody, "retryPolicy"),
+                deadLetterTopic(subscriptionBody),
+                maxDeliveryAttempts(subscriptionBody) == 0 ? null : maxDeliveryAttempts(subscriptionBody),
+                optionalBooleanValue(subscriptionBody, "enableMessageOrdering"),
+                optionalBooleanValue(subscriptionBody, "enableExactlyOnceDelivery"),
+                updateMaskPaths(updateMask(updateMask, body)));
         return Response.ok(subscriptionResponse(subscription)).build();
     }
 
@@ -339,6 +341,15 @@ public class PubSubRestController {
                 .map(String::trim)
                 .filter(path -> !path.isEmpty())
                 .toList();
+    }
+
+    private static String updateMask(String queryParam, Map<String, Object> body) {
+        return queryParam == null || queryParam.isBlank() ? stringValue(body, "updateMask") : queryParam;
+    }
+
+    private static Map<String, Object> updateResource(Map<String, Object> body, String key) {
+        Map<String, Object> nested = objectMap(body, key);
+        return nested == null ? body : nested;
     }
 
     private static String pushEndpoint(Map<String, Object> body) {
